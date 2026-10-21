@@ -159,4 +159,10 @@
          dots, the focus glow takes the app's colour and the dock band turns translucent. false keeps the plain
          shelf. Can also be set with "cinematic_home": true in a theme's config.json. -->
     <bool name="cinematic_home">false</bool>
+
+    <!-- How the wallpaper changes ("wallpaper_mode" in a theme's config.json): "rotation" picks a new image
+         from wallpapers/ every wallpaper_rotation_minutes; "time" shows one image per part of the day, named
+         bg_night (22:00-04:59, the default when a slot has no image), bg_morning (05:00-11:59), bg_afternoon
+         (12:00-16:59) and bg_dusk (17:00-21:59), as .jpg, .jpeg, .png or .webp. The parts match the greeting. -->
+    <string name="wallpaper_mode" translatable="false">rotation</string>
 </resources>
