@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- app_banners names drawables at run time, which resource shrinking cannot see: keep every banner_*. -->
+<!-- The clock-driven backdrops are resolved by getIdentifier too, so they need the same escape hatch. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/banner_*" />
+    tools:keep="@drawable/banner_*,@drawable/bg_night,@drawable/bg_morning,@drawable/bg_afternoon,@drawable/bg_dusk" />

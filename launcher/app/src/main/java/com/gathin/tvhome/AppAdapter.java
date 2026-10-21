@@ -698,10 +698,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                             .setDuration(advancedEffects ? (focused ? 220 : 170) : (focused ? 260 : 180))
                             .setInterpolator(new OvershootInterpolator(focused ? (advancedEffects ? 0.7f : 1.6f) : 0f))
                             .withLayer().start();
-                    if (advancedEffects) {
-                        banner.animate().scaleX(focused ? 1.035f : 1f).scaleY(focused ? 1.035f : 1f)
-                                .setDuration(280).start();
-                    }
+                    // The banner used to zoom 3.5% inside the card on top of the card's own 12% zoom. Two
+                    // scales on the same pixels meant re-rasterising the 16:9 banner inside a clipped layer
+                    // every frame, which measured 16 ms of draw on its own; the second zoom was invisible
+                    // under the first one anyway.
                     name.animate().alpha(focused ? 1f : 0f)
                             .translationY(focused ? density * 4f : -density * 6f)
                             .setDuration(220).start();

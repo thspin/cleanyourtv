@@ -107,6 +107,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
     private GlassView glass;
+    /** The frosted slab behind the dock row; null when the theme has no dock. */
+    private GlassDock dockGlass;
     private View ambient;
     private TextView heroName;
     /** The top shelf: heroName, plus the cinematic shelf's "Last opened" line and dock position dots. */
@@ -129,6 +131,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean animations;
     private boolean advancedEffects;
     private TextView greeting;
+    private TextView weatherPlace;
+    private TextView weatherCondition;
+    private TextView weatherTemp;
+    private Weather weather;
+    private View actionInputs;
+    private View actionReorder;
+    private View actionWallpaper;
     private View btnInputs;
     private TextView btnWifi;
     private TextView shamsiDate;
@@ -262,8 +271,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             updateGreeting();
             updateRace();
             updateWifiLabel();
+            refreshWeatherIfStale();
             sky.update();
             wallpaperPlayer.update();
+            // The backdrop may have crossed to another part of the day: the frost has to re-capture it.
+            if (dockGlass != null) dockGlass.refreshBackdrop();
             handler.postDelayed(this, MINUTE_MS);
         }
     };
@@ -297,6 +309,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
         if (festive) glass.setAccent(festival.accentColor());
+        dockGlass = findViewById(R.id.dockGlass);
         ambient = findViewById(R.id.ambient);
         // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
         // a fade renders it into a full-screen offscreen buffer first.
@@ -314,8 +327,25 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // dock_title false: the name above the dock (and the cinematic lines under it) never shows; the glow
         // still follows the dock.
         if (!cfg.dockTitle) hero.setVisibility(View.GONE);
+        // The photo backdrop replaces the cinematic shelf: the tile art it painted (heroArt) and the name above
+        // the dock (hero) were part of that look, and over a photo they read as leftover chrome.
+        if (!cinematic && cfg.wallpaperEnabled && cfg.wallpaperByTime) {
+            hero.setVisibility(View.GONE);
+            heroArt.setVisibility(View.GONE);
+        }
         greeting = findViewById(R.id.greeting);
         greetingColor = greeting.getCurrentTextColor();
+        weatherPlace = findViewById(R.id.weatherPlace);
+        weatherCondition = findViewById(R.id.weatherCondition);
+        weatherTemp = findViewById(R.id.weatherTemp);
+        actionInputs = findViewById(R.id.actionInputs);
+        actionReorder = findViewById(R.id.actionReorder);
+        actionWallpaper = findViewById(R.id.actionWallpaper);
+        // Show whatever was cached last, then ask Open-Meteo if that is stale. Never blocks: the card
+        // paints its placeholder immediately and fills in on the callback.
+        weather = WeatherClient.cached(this);
+        showWeather(weather);
+        refreshWeatherIfStale();
         btnWifi = findViewById(R.id.btnWifi);
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
@@ -393,7 +423,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public void onChildViewDetachedFromWindow(@NonNull View v) {
             }
         });
-        if (dockRow) grid.addItemDecoration(new DockDecoration(COLUMNS, density, cinematic));
+        if (dockRow) {
+            DockDecoration decoration = new DockDecoration(COLUMNS, density, cinematic);
+            // GlassDock paints the band; leaving this one to paint as well would stack a flat plate under the frost.
+            decoration.setPaintBand(false);
+            grid.addItemDecoration(decoration);
+        }
         if (animations) {
             int enterAnim = reducedMotion ? R.anim.tile_enter_reduced : R.anim.tile_enter;
             float enterDelay = reducedMotion ? 0f : 0.06f;
@@ -419,7 +454,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             int gridRows = itemH * rowsBelowDock;
             // Keep the hero below the header when the library is enabled on a short screen,
             // even when the theme requests an extra visible row below the dock.
-            int shelfClearance = cfg.appLibrary ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
+            int shelfClearance = cfg.appLibrary && hero.getVisibility() != View.GONE
+                    ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
             int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
             // Where the rows cannot fit even at the smallest tile (3 rows with the title on), the title keeps its
             // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
@@ -429,6 +465,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (grid.getPaddingTop() != want) {
                 grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
             }
+            placeDockGlass(grid, dockRow, cfg);
             // Cold start or column count > 4: the first focus can run before the grid has its final width or
             // padding, leaving the glass at the XML design size until a key is pressed.
             grid.post(this::refitGlass);
@@ -517,6 +554,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (festive) applyFestiveSkin((TextView) btnInputs, (TextView) btnSettings);
 
+        // The three actions under the dock. Same code paths the top pills use; the pills stay in the
+        // layout (themed on/off) but the home now surfaces these three instead.
+        actionInputs.setOnClickListener(v -> showInputs());
+        actionReorder.setOnClickListener(v -> toggleReorder());
+        actionWallpaper.setOnClickListener(v ->
+                open(new Intent(this, LauncherSettingsActivity.class)));
+        // The dock is COLUMNS wide, this row is three. Relative position would send DOWN from the last
+        // dock tile past the last action, so DOWN deep-links by third and UP returns to the same third.
+        View.OnKeyListener rowKeys = (v, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                focusTile(Math.min(COLUMNS - 1, actionIndexOf(v) * COLUMNS / 3));
+                return true;
+            }
+            return false;
+        };
+        for (View action : new View[]{actionInputs, actionReorder, actionWallpaper}) {
+            action.setOnKeyListener(rowKeys);
+            if (advancedEffects) {
+                action.setOnFocusChangeListener((view, focused) -> view.animate()
+                        .scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f)
+                        .setDuration(160).start());
+            }
+        }
+
         // Hide the glass when focus leaves the tiles.
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
             boolean onTile = newF != null && newF.getId() == R.id.card;
@@ -596,6 +658,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (showStats) startStats();
         sky.update();
         wallpaperPlayer.start();
+        if (dockGlass != null) dockGlass.setSource(root);
         handler.postDelayed(minuteTick, MINUTE_MS);
         if (festive && diya != null) {
             diya.start();
@@ -1119,6 +1182,79 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             revealRect.set(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
             grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
         }
+    }
+
+    /**
+     * Puts the frosted slab behind the dock row. The row's own geometry only exists once the tile size is
+     * known, so this runs from the grid's layout listener and reads the first attached dock holder rather
+     * than guessing from columns and padding.
+     */
+    private void placeDockGlass(RecyclerView grid, int dockRowPx, Config cfg) {
+        if (dockGlass == null) return;
+        if (!cfg.dockRow) {
+            dockGlass.setVisibility(View.GONE);
+            return;
+        }
+        RecyclerView.ViewHolder first = grid.findViewHolderForAdapterPosition(0);
+        if (first == null || first.itemView.getParent() == null || !first.itemView.isAttachedToWindow()) {
+            // The dock holder is not attached yet: try again once the recycler has laid out.
+            grid.post(() -> placeDockGlass(grid, dockRowPx, cfg));
+            return;
+        }
+        // The row is uniform: every tile is the same width and sits in its own column, so once the first card's
+        // top-left is known the rest follow arithmetically. Walking the holders measured each one, but with
+        // seven tiles the last one poked past the recycler and getGlobalVisibleRect clipped it, so the slab
+        // stopped short; and getLocationOnScreen on the holders returned pre-layout coordinates.
+        Rect firstRect = new Rect();
+        if (!first.itemView.getGlobalVisibleRect(firstRect)) {
+            grid.post(() -> placeDockGlass(grid, dockRowPx, cfg));
+            return;
+        }
+        int itemH = first.itemView.getHeight();
+        int columns = Math.max(1, COLUMNS);
+        int docked = Math.min(cfg.dockApps.size(), adapter.appCount());
+        int rowEnd = Math.min(docked, columns);   // the dock is the first row: walk it only
+        // The column pitch comes from the second tile: same width, one cell to the right. Dividing the
+        // recycler by the column count would miss the padding the grid hands its first row.
+        int cell = 0;
+        RecyclerView.ViewHolder second = rowEnd > 1 ? grid.findViewHolderForAdapterPosition(1) : null;
+        if (second != null && second.itemView.getParent() != null) {
+            Rect r = new Rect();
+            if (second.itemView.getGlobalVisibleRect(r)) cell = r.left - firstRect.left;
+        }
+        if (cell <= 0) cell = grid.getWidth() / columns;
+        int left = firstRect.left;
+        int right = left + cell * (rowEnd - 1) + Math.min(first.itemView.getWidth(), cell);
+        int top = firstRect.top;
+        int bottom = top + itemH;
+
+        int[] rootPos = new int[2];
+        root.getLocationOnScreen(rootPos);
+        Rect slab = new Rect(left - rootPos[0], top - rootPos[1],
+                right - rootPos[0], bottom - rootPos[1]);
+
+        // DockDecoration insets its band by 14dp; keep that reach so the slab still frames the cards.
+        int pad = (int) (14 * density);
+        int w = slab.width() + pad * 2;
+        int h = slab.height() + pad * 2;
+        // A FrameLayout child is measured and laid out again by its parent, so a bare layout() call is undone on
+        // the next pass (the view stayed 0,0-0,0). Margins are the only positioning a parent layout honours:
+        // gravity TOP|START puts the slab's origin at (leftMargin, topMargin).
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.leftMargin = slab.left - pad;
+        lp.topMargin = slab.top - pad;
+        boolean moved = !(dockGlass.getLayoutParams() instanceof FrameLayout.LayoutParams)
+                || dockGlass.getLayoutParams().width != w
+                || dockGlass.getLayoutParams().height != h
+                || ((FrameLayout.LayoutParams) dockGlass.getLayoutParams()).leftMargin != lp.leftMargin
+                || ((FrameLayout.LayoutParams) dockGlass.getLayoutParams()).topMargin != lp.topMargin;
+        if (moved) dockGlass.setLayoutParams(lp);
+        dockGlass.setCornerRadius(26 * density);
+        if (dockGlass.getVisibility() != View.VISIBLE) dockGlass.setVisibility(View.VISIBLE);
+        // Recapture only when the slab actually moved: build() blurs on the CPU, and a rebuild per layout
+        // pass cost ~20 ms a frame with no visual change to show for it.
+        if (moved) dockGlass.refreshBackdrop();
     }
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
@@ -1760,13 +1896,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // ---- top bar ---------------------------------------------------------------------------------
 
     private void updateGreeting() {
-        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        // The backdrop and the words share one clock, but not one cut: DUSK starts at 17:00 for the photo
+        // (the sun is already going down) while "buenas noches" at 17:01 would be wrong, so the greeting
+        // keeps its own evening boundary an hour later.
+        Calendar now = Calendar.getInstance();
+        int minuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
         int res;
-        if (hour < 5) res = R.string.good_night;
-        else if (hour < 12) res = R.string.good_morning;
-        else if (hour < 17) res = R.string.good_afternoon;
-        else if (hour < 22) res = R.string.good_evening;
-        else res = R.string.good_night;
+        switch (TimeWindow.at(minuteOfDay)) {
+            case NIGHT: res = R.string.good_night; break;
+            case MORNING: res = R.string.good_morning; break;
+            case AFTERNOON: res = R.string.good_afternoon; break;
+            default: res = minuteOfDay < 1200 ? R.string.good_afternoon : R.string.good_evening; break;
+        }
         String festiveGreeting = festive ? festival.greetingText() : "";
         if (!festiveGreeting.isEmpty()) {
             greeting.setText(festiveGreeting);
@@ -1777,6 +1918,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             greeting.setTextColor(greetingColor);
         }
         if (shamsi) shamsiDate.setText(Shamsi.today());
+        else updateDate(now);
+    }
+
+    /**
+     * "martes 20 de octubre". Written out rather than left to the date_format string: TextClock and
+     * SimpleDateFormat both follow the device locale, and this TV runs in English, which produced
+     * "Tuesday 20 de October" - an English weekday inside a Spanish sentence.
+     */
+    private void updateDate(Calendar now) {
+        TextView date = findViewById(R.id.date);
+        if (date == null) return;
+        String[] days = {"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"};
+        String[] months = {"enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
+        String text = days[now.get(Calendar.DAY_OF_WEEK) - 1] + " "
+                + now.get(Calendar.DAY_OF_MONTH) + " de "
+                + months[now.get(Calendar.MONTH)];
+        date.setText(text);
     }
 
     // ---- race-weekend panel (a theme's race_calendar) -----------------------------------------------
@@ -2032,6 +2191,48 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } catch (ActivityNotFoundException e) {
             Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Which of the three dock actions this view is: 0 inputs, 1 reorder, 2 wallpaper. */
+    private int actionIndexOf(View v) {
+        if (v == actionReorder) return 1;
+        if (v == actionWallpaper) return 2;
+        return 0;
+    }
+
+    // ---- weather card ---------------------------------------------------------------------------
+
+    private void refreshWeatherIfStale() {
+        if (!WeatherClient.isStale(weather, System.currentTimeMillis())) return;
+        WeatherClient.fetch(this, w -> {
+            // An empty result means the fetch failed; WeatherClient has already logged why. Keep the
+            // cached reading on screen rather than blanking the card.
+            if (!w.valid) {
+                if (weather.valid) weatherCondition.setText(R.string.weather_no_connection);
+                return;
+            }
+            weather = w;
+            showWeather(w);
+        });
+    }
+
+    /** Paints the card from a Weather. Nothing here allocates per minute; it runs on fetch and resume. */
+    private void showWeather(Weather w) {
+        if (weatherPlace == null) return;
+        if (!w.valid) {
+            weatherPlace.setText(R.string.weather_dash);
+            weatherCondition.setText(R.string.weather_dash);
+            weatherTemp.setText(R.string.weather_loading);
+            weatherTemp.setTextColor(0x66FFFFFF);
+            return;
+        }
+        weatherPlace.setText(w.place);
+        weatherCondition.setText(w.condition);
+        String degrees = Math.round(w.temperatureC) + "°";
+        weatherTemp.setText(degrees);
+        weatherTemp.setTextColor(0xFFFFFFFF);
+        // Five characters ("-12°" or "100°") overflow 40sp at 284dp; step down once.
+        weatherTemp.setTextSize(degrees.length() > 4 ? 34f : 40f);
     }
 
     /** Switches to a passthrough input (HDMI, AV). The standard way is ACTION_VIEW on its channel URI,

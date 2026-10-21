@@ -152,6 +152,26 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Legibility scrim over the lower band: the action row and the dock sit on top of the wallpaper. -->
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="match_parent"
+        android:layout_height="296dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/scrim_bottom"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+    <!-- Frosted band under the dock row: a capture of the backdrop, softened, under a glass slab. It is
+         sized and placed by MainActivity once the grid knows where its first row landed. Declared before the
+         content column so it paints behind the dock cards, not over them. -->
+    <com.gathin.tvhome.GlassDock
+        android:id="@+id/dockGlass"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -159,6 +179,7 @@
         android:paddingStart="56dp"
         android:paddingEnd="56dp"
         android:paddingTop="26dp"
+        android:paddingBottom="62dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -174,109 +195,153 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
-                android:layout_toEndOf="@+id/topButtons"
-                android:layout_marginStart="16dp"
-                android:orientation="horizontal"
-                android:gravity="right|bottom">
+                android:layout_toEndOf="@+id/weatherCard"
+                android:layout_marginStart="24dp"
+                android:orientation="vertical"
+                android:gravity="right">
+
+                <TextView
+                    android:id="@+id/greeting"
+                    android:gravity="right"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="44sp"
+                    android:fontFamily="@font/outfit_light"
+                    android:letterSpacing="-0.02" />
+
+                <!-- A TextView, not a TextClock: TextClock formats with the device locale, and this TV is set to
+                     English, so the date would read "Tuesday 20 de October". MainActivity formats it in Spanish. -->
+                <TextView
+                    android:id="@+id/date"
+                    android:gravity="right"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="18sp"
+                    android:fontFamily="@font/outfit_light"
+                    android:letterSpacing="0" />
+
+                <!-- Shamsi date ("27 Mehr 1405"), shown when shamsi_date is on. -->
+                <TextView
+                    android:id="@+id/shamsiDate"
+                    android:gravity="right"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="17sp"
+                    android:fontFamily="@font/outfit_regular"
+                    android:letterSpacing="0.02"
+                    android:includeFontPadding="false"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Weather for the place the launcher is set to (Weather/WeatherClient), mirrored: on the left. -->
+            <LinearLayout
+                android:id="@+id/weatherCard"
+                android:layout_width="330dp"
+                android:layout_height="112dp"
+                android:layout_alignParentStart="true"
+                android:layout_alignTop="@id/leftBlock"
+                android:background="@drawable/weather_card_bg"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:focusable="false"
+                android:importantForAccessibility="no">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:layout_marginBottom="9dp"
-                    android:orientation="vertical">
-
-                    <!-- Shamsi date ("27 Mehr 1405"), shown when shamsi_date is on. -->
-                    <TextView
-                        android:id="@+id/shamsiDate"
-                        android:gravity="right"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:textColor="#E6FFFFFF"
-                        android:textSize="17sp"
-                        android:fontFamily="@font/outfit_regular"
-                        android:letterSpacing="0.02"
-                        android:includeFontPadding="false"
-                        android:visibility="gone" />
-
-                    <TextClock
-                        android:id="@+id/date"
-                        android:gravity="right"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:format12Hour="@string/date_format"
-                        android:format24Hour="@string/date_format"
-                        android:textColor="#A6FFFFFF"
-                        android:textSize="14sp"
-                        android:fontFamily="@font/outfit_regular"
-                        android:letterSpacing="0.14"
-                        android:textAllCaps="true" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="26dp"
-                    android:layout_gravity="bottom"
-                    android:layout_marginStart="16dp"
-                    android:layout_marginEnd="16dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="#33FFFFFF" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/greeting"
-                        android:gravity="center_horizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:textColor="#8CFFFFFF"
-                        android:textSize="12sp"
-                        android:fontFamily="@font/outfit_medium"
-                        android:letterSpacing="0.22"
-                        android:textAllCaps="true" />
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:baselineAligned="true">
+                        android:gravity="bottom">
+
                         <TextClock
-                            android:id="@+id/clock"
+                            android:id="@+id/weatherClock"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginEnd="12dp"
+                            android:singleLine="true"
                             android:format12Hour="h:mm"
                             android:format24Hour="HH:mm"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="52sp"
+                            android:textColor="#D9FFFFFF"
+                            android:textSize="40sp"
                             android:fontFamily="@font/outfit_light"
-                            android:letterSpacing="-0.04"
+                            android:letterSpacing="-0.03"
                             android:includeFontPadding="false" />
 
-                        <TextClock
-                            android:id="@+id/ampm"
+                        <TextView
+                            android:id="@+id/weatherTemp"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_gravity="bottom"
-                            android:layout_marginBottom="8dp"
-                            android:format12Hour="a"
-                            android:format24Hour=""
-                            android:textColor="#B3FFFFFF"
-                            android:textSize="15sp"
-                            android:fontFamily="@font/outfit_medium"
-                            android:letterSpacing="0.08"
-                            android:textAllCaps="true" />
+                            android:singleLine="true"
+                            android:text="--°"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="40sp"
+                            android:fontFamily="@font/outfit_light"
+                            android:letterSpacing="-0.03"
+                            android:includeFontPadding="false" />
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/weatherPlace"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="right"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:text="Buenos Aires"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="18sp"
+                            android:fontFamily="@font/outfit_regular" />
+
+                        <TextView
+                            android:id="@+id/weatherCondition"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="right"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:text="\u2014"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="14sp"
+                            android:fontFamily="@font/outfit_light" />
+                    </LinearLayout>
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/weatherAttribution"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="start"
+                    android:singleLine="true"
+                    android:text="Open-Meteo · CC BY 4.0"
+                    android:textColor="#59FFFFFF"
+                    android:textSize="8sp"
+                    android:fontFamily="@font/outfit_regular" />
             </LinearLayout>
 
             <!-- Shown only when show_stats is on. Outside leftBlock, so the top buttons stay level with the clock
@@ -308,6 +373,7 @@
                 android:layout_marginBottom="6dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
+                android:visibility="gone"
                 android:orientation="horizontal">
 
                 <TextView
@@ -356,12 +422,116 @@
                 android:layout_height="match_parent"
                 android:paddingTop="10dp"
                 android:paddingBottom="40dp"
-                android:clipToPadding="false"
-                android:clipChildren="false"
+                android:clipToPadding="true"
+                android:clipChildren="true"
                 android:overScrollMode="never"
                 android:scrollbars="none"
                 android:descendantFocusability="afterDescendants" />
         </FrameLayout>
+    </LinearLayout>
+
+    <!-- Quick actions, under the dock (same order as the LTR layout: a right-to-left UI reads right to left,
+         but the row mirrors as a whole because it is laid out by the frame's start/end gravity). -->
+    <LinearLayout
+        android:id="@+id/actionRow"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:orientation="horizontal"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:importantForAccessibility="noHideDescendants">
+
+        <LinearLayout
+            android:id="@+id/actionInputs"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/pill_bg"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:gravity="center_vertical"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_input"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/inputs"
+                android:textColor="#99FFFFFF"
+                android:textSize="14sp"
+                android:fontFamily="@font/outfit_medium"
+                android:singleLine="true" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionReorder"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/pill_bg"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:gravity="center_vertical"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_swap_vert"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/reorder_short"
+                android:textColor="#99FFFFFF"
+                android:textSize="14sp"
+                android:fontFamily="@font/outfit_medium"
+                android:singleLine="true" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionWallpaper"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/pill_bg"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:gravity="center_vertical"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_picture"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/wallpaper_short"
+                android:textColor="#99FFFFFF"
+                android:textSize="14sp"
+                android:fontFamily="@font/outfit_medium"
+                android:singleLine="true" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The single floating glass highlight that springs between tiles. -->

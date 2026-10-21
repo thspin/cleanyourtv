@@ -28,6 +28,17 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         edge.setColor(translucent ? 0x26FFFFFF : 0x1FFFFFFF);
     }
 
+    /**
+     * The band itself is painted by {@link GlassDock}, which draws the frosted backdrop and the glass
+     * over it; two paints here would stack a flat plate under the frost. This decoration keeps only the
+     * offsets that reserve the row's vertical room.
+     */
+    void setPaintBand(boolean paint) {
+        this.paintBand = paint;
+    }
+
+    private boolean paintBand = true;
+
     @Override
     public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent,
                                @NonNull RecyclerView.State state) {
@@ -40,6 +51,7 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
 
     @Override
     public void onDraw(@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
+        if (!paintBand) return;
         boolean any = false;
         for (int i = 0; i < parent.getChildCount(); i++) {
             View child = parent.getChildAt(i);

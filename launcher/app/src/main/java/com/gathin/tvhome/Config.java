@@ -95,6 +95,11 @@ final class Config {
     /** Rotating theme images, or the single wallpaper when no collection is configured. */
     final List<File> wallpapers;
     final int wallpaperRotationMinutes;
+    /**
+     * How the wallpaper changes (config.json, wallpaper_mode): {@code "time"} shows bg_night,
+     * bg_morning, bg_afternoon and bg_dusk by the clock; anything else keeps the timed rotation.
+     */
+    final boolean wallpaperByTime;
     final int wallpaperDim;
     /** Whether the overlay file was present and parsed. */
     final boolean overlayApplied;
@@ -112,7 +117,7 @@ final class Config {
                    boolean shamsiDate, String greetingName, boolean moduleCards, boolean reducedMotion, boolean dockTitle, boolean dockRow, boolean reorderButton, String vpnApp,
                    boolean showHomeSettingsShortcut, boolean showStats, boolean appLibrary, int backgroundColor, int skyIntensity,
                    int[] settingsKeycodes, boolean settingsKeyPanel, boolean wallpaperEnabled, File wallpaper, List<File> wallpapers,
-                   int wallpaperRotationMinutes, int wallpaperDim, boolean overlayApplied,
+                   int wallpaperRotationMinutes, boolean wallpaperByTime, int wallpaperDim, boolean overlayApplied,
                    Festival festival, int[] inputKeycodes, List<String> appKeys,
                    List<RaceWeekend.Race> raceCalendar, boolean cinematicHome) {
         this.inputKeycodes = inputKeycodes;
@@ -151,6 +156,7 @@ final class Config {
         this.wallpaper = wallpaper;
         this.wallpapers = Collections.unmodifiableList(wallpapers);
         this.wallpaperRotationMinutes = wallpaperRotationMinutes;
+        this.wallpaperByTime = wallpaperByTime;
         this.wallpaperDim = wallpaperDim;
         this.overlayApplied = overlayApplied;
         this.festival = festival;
@@ -255,9 +261,15 @@ final class Config {
         boolean wallpaperEnabled = json == null || bool(json, "wallpaper", true);
         if (!wallpaperEnabled) wallpaper = null;
         int rotationMinutes = json == null ? 0 : integer(json, "wallpaper_rotation_minutes", 0, 0, 1440);
+        // "time": one picture per part of the day (TimeWindow); anything else keeps the rotation.
+        boolean wallpaperByTime = json != null
+                && "time".equalsIgnoreCase(string(json, "wallpaper_mode", ""));
         int wallpaperDim = json == null ? 0 : integer(json, "wallpaper_dim", 0, 0, 90);
+        // The cinematic shelf paints the focused app's artwork over the whole screen. A photo backdrop and
+        // that artwork are two full-screen pictures fighting for the same pixels, so "time" mode wins.
+        if (wallpaperByTime && wallpaperEnabled) cinematic = false;
         List<File> wallpapers = new ArrayList<>();
-        if (rotationMinutes > 0 && dir != null && wallpaperEnabled) {
+        if ((rotationMinutes > 0 || wallpaperByTime) && dir != null && wallpaperEnabled) {
             wallpapers.addAll(WallpaperRotation.images(new File(dir, "wallpapers")));
         }
         if (wallpapers.isEmpty() && wallpaper != null) wallpapers.add(wallpaper);
@@ -290,7 +302,7 @@ final class Config {
                 Math.max(1, columns), Math.max(0, rowsBelow), animations, advancedEffects,
                 shamsi, greetingName, moduleCards, reducedMotion, dockTitle, dockRow, reorderButton, vpn, homeSettings, showStats, library, background,
                 Math.max(0, Math.min(100, skyIntensity)), settingsKeycodes, settingsKeyPanel, wallpaperEnabled, wallpaper,
-                wallpapers, rotationMinutes, wallpaperDim, applied,
+                wallpapers, rotationMinutes, wallpaperByTime, wallpaperDim, applied,
                 festival, inputKeycodes, appKeys, json == null ? Collections.emptyList() : raceCalendar(json), cinematic);
     }
 
