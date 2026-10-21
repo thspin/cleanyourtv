@@ -3,24 +3,70 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 : "${TV_HOST:?set TV_HOST to the TV IP address, e.g. TV_HOST=192.168.1.50 $0}"
+TOOLS="$(cd ../tools && pwd)"   # absolute, so the venv's Python doesn't warn about "../" in its prefix
+PY=$TOOLS/venv/bin/python
+[ -x "$PY" ] || PY=$TOOLS/venv/Scripts/python.exe
+export MSYS_NO_PATHCONV=1
+# Below minSdk, `pm install` refuses the APK with INSTALL_FAILED_OLDER_SDK - and only after gradle has
+# spent a minute building and b64push has pushed the APK to the TV (#576). Ask the TV first. The
+# number comes from the build file, so it follows the launcher instead of a hard-coded copy here.
+MIN_SDK=$(sed -n 's/^[[:space:]]*minSdk[[:space:]][[:space:]]*\([0-9]\{1,3\}\)[[:space:]]*$/\1/p' app/build.gradle 2>/dev/null | head -n 1 || true)
+TV_SDK=$("$PY" -I "$TOOLS/tv.py" 'getprop ro.build.version.sdk' 2>/dev/null | tr -dc '0-9' || true)
+if [ -n "$MIN_SDK" ] && [ -n "$TV_SDK" ] && [ "$TV_SDK" -lt "$MIN_SDK" ]; then
+  echo "ERROR: this TV runs SDK $TV_SDK and the launcher is built with minSdk $MIN_SDK (app/build.gradle)," >&2
+  echo "so pm install would answer INSTALL_FAILED_OLDER_SDK. Nothing was built, pushed or disabled." >&2
+  echo "The debloat half of the repo still applies to that set, from its own home screen; the launcher" >&2
+  echo "half would need your own build with a lower minSdk (docs/TROUBLESHOOTING.md)." >&2
+  exit 1
+fi
 # macOS: java_home or Homebrew; Linux: the java on PATH.
-export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || { [ -d /opt/homebrew/opt/openjdk@17 ] && echo /opt/homebrew/opt/openjdk@17; } || java -XshowSettings:properties -version 2>&1 | awk '/java.home/ {print $3}')}"
+# `/usr/libexec/java_home -v 17` means "17 or newer", so on a Mac whose only JDK is newer it prints
+# that one and exits 0, and the Homebrew fallback below never runs. Gradle 8.9 then stops with
+# "Unsupported class file major version" (68 for JDK 24) before it reads a line of this project.
+# Homebrew's openjdk@17 is keg-only and is never registered where java_home would find it, so check
+# the version it answers with and fall through when it is not a 17. `java -version` goes to a
+# variable rather than through `grep -q`, whose early exit can SIGPIPE the JVM under `set -o pipefail`.
+if [ -z "${JAVA_HOME:-}" ]; then
+  JH="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+  if [ -n "$JH" ]; then
+    case "$("$JH/bin/java" -version 2>&1 || true)" in *'version "17.'*) ;; *) JH="" ;; esac
+  fi
+  if [ -z "$JH" ] && [ -d /opt/homebrew/opt/openjdk@17 ]; then JH=/opt/homebrew/opt/openjdk@17; fi
+  if [ -z "$JH" ]; then JH="$(java -XshowSettings:properties -version 2>&1 | awk '/java.home/ {print $3}')"; fi
+  JAVA_HOME="$JH"
+fi
+export JAVA_HOME
 # Android Studio's default SDK location on macOS, then on Linux, then Homebrew's command-line tools.
 export ANDROID_HOME="${ANDROID_HOME:-$(for d in ~/Library/Android/sdk ~/Android/Sdk; do [ -d "$d" ] && echo "$d" && break; done)}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export PATH="$JAVA_HOME/bin:$PATH"
 [ -f local.properties ] || echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleRelease -q --console=plain
-TOOLS="$(cd ../tools && pwd)"   # absolute, so the venv's Python doesn't warn about "../" in its prefix
-PY=$TOOLS/venv/bin/python
-[ -x "$PY" ] || PY=$TOOLS/venv/Scripts/python.exe
-export MSYS_NO_PATHCONV=1
+KNOWN_STOCK_LAUNCHERS="com.google.android.tvlauncher com.google.android.apps.tv.launcherx com.google.android.leanbacklauncher com.mitv.tvhome"
+SETUP_WIZARD=com.google.android.tungsten.setupwraith
+# take_over_home in config.xml (comments stripped first): keep the stock launcher and setupwraith, for
+# Google TV builds that need setupwraith for casting (docs/TROUBLESHOOTING.md), and let HomeKeyService
+# open this launcher instead.
+TAKE_OVER_HOME=0
+CONFIG=app/src/main/res/values/config.xml
+if [ -f "$CONFIG" ]; then
+  case "$(tr -d ' \t\r\n' < "$CONFIG" | sed -E 's/<!--([^-]|-[^-])*-->//g')" in
+    *'<boolname="take_over_home">true</bool>'*) TAKE_OVER_HOME=1 ;;
+  esac
+fi
+# A TV that was cleaned up before has its stock launcher disabled (Home then answers with this
+# launcher or setupwraith's RecoveryActivity): take the one disabled stock launcher, to enable it again.
+if [ "$TAKE_OVER_HOME" = 1 ] && [ -z "${STOCK_LAUNCHER:-}" ]; then
+  DISABLED=" $("$PY" -I ../tools/tv.py 'pm list packages --user 0 -d' 2>/dev/null | tr -d '\r' | sed 's/^package://' | tr '\n' ' ' || true) "
+  N=0; FOUND=""
+  for k in $KNOWN_STOCK_LAUNCHERS; do case "$DISABLED" in *" $k "*) N=$((N + 1)); FOUND=$k ;; esac; done
+  if [ "$N" = 1 ]; then STOCK_LAUNCHER=$FOUND; echo "take_over_home: $STOCK_LAUNCHER is disabled and will be enabled again."; fi
+fi
 # Which app owns Home differs by build (com.google.android.tvlauncher on Android TV,
 # com.google.android.apps.tv.launcherx on newer Google TV), so ask the TV instead of guessing.
 # Only a launcher we recognise is accepted: the answer can also be Android's chooser ("android"),
 # the setup wizard, or another third-party launcher, none of which should be disabled by accident.
 # Pass STOCK_LAUNCHER=<package> to name it yourself, or STOCK_LAUNCHER=none to disable nothing.
-KNOWN_STOCK_LAUNCHERS="com.google.android.tvlauncher com.google.android.apps.tv.launcherx com.google.android.leanbacklauncher com.mitv.tvhome"
 if [ -z "${STOCK_LAUNCHER:-}" ]; then
   HOME_PKG=$("$PY" -I ../tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' \
     | tail -n 1 | tr -d '\r' | cut -d/ -f1) || {
@@ -58,8 +104,17 @@ if [ -z "${STOCK_LAUNCHER:-}" ]; then
 fi
 echo "Stock launcher: $STOCK_LAUNCHER"
 HOME_QUERY='cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
-if [ "$STOCK_LAUNCHER" = none ]; then DISABLE_STOCK="echo stock launcher left alone"
-else DISABLE_STOCK="pm disable-user --user 0 $STOCK_LAUNCHER"; fi
+if [ "$TAKE_OVER_HOME" = 1 ]; then
+  if [ "$STOCK_LAUNCHER" = none ]; then
+    echo "ERROR: take_over_home keeps the stock launcher, and none was found to keep. Run again with" >&2
+    echo "STOCK_LAUNCHER=<its package>, e.g. com.google.android.apps.tv.launcherx; it is enabled, not disabled." >&2
+    exit 1
+  fi
+  # Enabled and checked on its own below, before setupwraith is.
+  STOCK_STEP="echo stock launcher kept"
+  SETUP_STEP="pm enable --user 0 $SETUP_WIZARD"
+elif [ "$STOCK_LAUNCHER" = none ]; then STOCK_STEP="echo stock launcher left alone"; SETUP_STEP=""
+else STOCK_STEP="pm disable-user --user 0 $STOCK_LAUNCHER"; SETUP_STEP=""; fi
 APK=app/build/outputs/apk/release/app-release.apk
 "$PY" -I ../tools/b64push.py "$APK" /data/local/tmp/tvhome.apk
 # Install on its own: in the batch below a failed install (e.g. "not enough space" on a full /data)
@@ -68,6 +123,12 @@ OUT=$("$PY" -I ../tools/tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f /
 echo "$OUT"
 case "$OUT" in
   *Success*) ;;
+  *INSTALL_FAILED_OLDER_SDK*)
+    # The pre-flight above missed it (a TV whose getprop did not answer, or an APK built elsewhere):
+    # name the real cause instead of leaving the raw Failure line to be read as an ADB problem.
+    echo "ERROR: pm install refused the APK as too new for this set (INSTALL_FAILED_OLDER_SDK): the TV runs an older SDK than the launcher's minSdk ${MIN_SDK:-in app/build.gradle}." >&2
+    echo "The stock launcher was left untouched. Read both numbers and see docs/TROUBLESHOOTING.md." >&2
+    exit 1 ;;
   *) echo "ERROR: pm install failed; the stock launcher was left untouched." >&2; exit 1 ;;
 esac
 # Start the launcher on its own, before the stock Home is touched. In the batch below a start that
@@ -82,10 +143,25 @@ if ! printf '%s' "$START_OUT" | grep -qF 'Status: ok' || printf '%s' "$START_OUT
   echo "ERROR: the new launcher did not start (see above); $STOCK_LAUNCHER was left enabled." >&2
   exit 1
 fi
+# take_over_home: the stock launcher has to be enabled before setupwraith is, and a batch carries on past
+# a failed command, so enable it on its own and check: setupwraith enabled with the stock launcher
+# disabled crash-loops system_server.
+if [ "$TAKE_OVER_HOME" = 1 ]; then
+  "$PY" -I ../tools/tv.py "pm enable --user 0 $STOCK_LAUNCHER" || true
+  # --user 0: without it Android 14 lists a package enabled for any user (a second profile, say).
+  ENABLED=" $("$PY" -I ../tools/tv.py "pm list packages --user 0 -e $STOCK_LAUNCHER" 2>/dev/null | tr -d '\r' | tr '\n' ' ' || true) "
+  case "$ENABLED" in
+    *" package:$STOCK_LAUNCHER "*) echo "$STOCK_LAUNCHER is enabled." ;;
+    *)
+      echo "ERROR: $STOCK_LAUNCHER could not be enabled, so setupwraith and Home were left alone." >&2
+      exit 1 ;;
+  esac
+fi
 printf '%s\n' \
   "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
   "cmd package compile -m speed -f com.gathin.tvhome" \
-  "$DISABLE_STOCK" \
+  "$STOCK_STEP" \
+  "$SETUP_STEP" \
   "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
   | "$PY" -I ../tools/tv.py --batch
 
@@ -129,21 +205,42 @@ rollback_home() {
 # system_server (see examples/xiaomi-tv-a-pro-2026). So check where Home ended up, and put the
 # stock launcher back if it is not ours.
 HOME_NOW=$(query_home)
-case "$HOME_NOW" in
-  com.gathin.tvhome/*) echo "Home now resolves to $HOME_NOW" ;;
-  *)
-    if [ -z "$HOME_NOW" ]; then
-      echo "ERROR: the TV stopped answering while Home was being switched, so the outcome is unknown." >&2
-    else
-      echo "ERROR: Home resolves to $HOME_NOW, not to the new launcher." >&2
-    fi
-    rollback_home || true
-    if [ -n "$HOME_NOW" ]; then
-      echo "On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to" >&2
-      echo "your debloat list (see README, Troubleshooting), apply the list, then run this script again." >&2
-    fi
-    exit 1 ;;
-esac
+if [ "$TAKE_OVER_HOME" = 1 ]; then
+  # Nothing was disabled, so there is nothing to roll back; only check that the takeover can work.
+  case "$HOME_NOW" in
+    "$STOCK_LAUNCHER"/*|com.gathin.tvhome/*) ;;
+    *)
+      echo "ERROR: Home resolves to '${HOME_NOW:-nothing}', not to $STOCK_LAUNCHER, which take_over_home keeps as" >&2
+      echo "Android's Home; HomeKeyService is left off. List the candidates with" >&2
+      echo "  cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME" >&2
+      exit 1 ;;
+  esac
+  ROLE=$("$PY" -I ../tools/tv.py 'cmd role get-role-holders --user 0 android.app.role.HOME' 2>/dev/null | tr -d '\r' || true)
+  case "$ROLE" in
+    *com.gathin.tvhome*) echo "Home stays with $HOME_NOW for Android; HomeKeyService opens this launcher instead." ;;
+    *)
+      echo "ERROR: the HOME role belongs to '${ROLE:-nobody}', not to this launcher, so HomeKeyService would not" >&2
+      echo "take over Home. take_over_home needs Android 10 or newer." >&2
+      exit 1 ;;
+  esac
+else
+  case "$HOME_NOW" in
+    com.gathin.tvhome/*) echo "Home now resolves to $HOME_NOW" ;;
+    *)
+      if [ -z "$HOME_NOW" ]; then
+        echo "ERROR: the TV stopped answering while Home was being switched, so the outcome is unknown." >&2
+      else
+        echo "ERROR: Home resolves to $HOME_NOW, not to the new launcher." >&2
+      fi
+      rollback_home || true
+      if [ -n "$HOME_NOW" ]; then
+        echo "On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to" >&2
+        echo "your debloat list (see README, Troubleshooting), apply the list, then run this script again." >&2
+        echo "If casting has to keep working (setupwraith), set take_over_home in config.xml instead." >&2
+      fi
+      exit 1 ;;
+  esac
+fi
 
 # Optional accessibility services. Off unless asked for, and Android switches them off again on
 # every reinstall, so pass the flag each time you run this script.
@@ -151,11 +248,12 @@ esac
 #                         app; Google TV needs this once the stock launcher is gone (InputKeyService).
 #                         It also handles input_key_keycodes and app_keys (config.xml or a theme; a YouTube button)
 #   HOME_KEY_SERVICE=1    remotes whose Home button sends KEYCODE_ALL_APPS instead of HOME, e.g. Xiaomi
-#                         sticks: the key is routed to the launcher (HomeKeyService)
+#                         sticks: the key is routed to the launcher (HomeKeyService). take_over_home in
+#                         config.xml turns it on as well.
 enable_service() {   # appends to enabled_accessibility_services without dropping other services
   svc=com.gathin.tvhome/.$1
   "$PY" -I ../tools/tv.py "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$1*) ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo $1 enabled"
 }
 if [ "${INPUT_KEY_SERVICE:-0}" = 1 ]; then enable_service InputKeyService; fi
-if [ "${HOME_KEY_SERVICE:-0}" = 1 ]; then enable_service HomeKeyService; fi
+if [ "${HOME_KEY_SERVICE:-0}" = 1 ] || [ "$TAKE_OVER_HOME" = 1 ]; then enable_service HomeKeyService; fi
 echo "Installed. Press Home on the remote to see it."

@@ -80,7 +80,10 @@ Launcher
   the matching `examples/` header says what to do. Before disabling setupwraith, run
   `dumpsys wifi | grep -o 'cname=[^ ]*'`: a Wi-Fi network saved during first setup belongs to it, and
   Android deletes that network the moment it is disabled, which takes the TV off Wi-Fi and ADB. If it
-  does, ask me to forget the network and re-join it in Settings first.
+  does, ask me to forget the network and re-join it in Settings first. Where casting needs
+  setupwraith (the matching `examples/` header says so), ask me whether I cast from my phone; if I
+  do, keep it and the stock launcher enabled and set `take_over_home` in `config.xml` instead. Never
+  leave setupwraith enabled with the stock launcher disabled: that crash-loops system_server.
 - On Google TV the stock launcher also answers the remote's app buttons (Netflix, YouTube and the like),
   Input and Settings/dashboard buttons, so after disabling it ask me to press each one, and remap any that
   do nothing with the launcher's key services: `input_key_keycodes` and `app_keys` with

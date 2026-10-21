@@ -28,7 +28,13 @@
 #   "Created singleton instance of ClientAuthSigner" in logcat, then disable it again - the receiver
 #   holds the credentials in memory, so casting works until the next reboot
 #   (docs/TROUBLESHOOTING.md, "Casting fails with Untrusted device").
-# - With launcherx disabled the YouTube button on the remote does nothing. It sends BUTTON_3
+#   A third way keeps casting and the new Home: comment out the setupwraith line at the end of this
+#   list and set take_over_home in config.xml. build-and-install.sh then keeps launcherx too, and
+#   HomeKeyService opens the new launcher for the Home button and whenever Android shows the stock
+#   home screen (start-up, wake). Never leave setupwraith enabled with launcherx disabled: at the next
+#   restart its RecoveryActivity takes Home and system_server crash-loops.
+# - With launcherx disabled the YouTube button on the remote does nothing (with take_over_home it
+#   stays enabled, and the button keeps working). It sends BUTTON_3
 #   (keycode 190). Button Mapper only remaps added buttons in its paid Pro version; Key Mapper
 #   (open source, keymapperorg/KeyMapper) does it for free. Play Store lists Key Mapper as incompatible
 #   with this device, so install the -foss APK from its GitHub releases, then over ADB:
@@ -74,6 +80,7 @@ com.google.android.backdrop
 
 # Stock home. launcher/build-and-install.sh disables launcherx itself once the new launcher is installed
 # and verified, and restore.sh re-enables it; setupwraith has to go too on this firmware (see quirks),
-# so it stays in the list for restore.sh to bring back.
+# so it stays in the list for restore.sh to bring back. To keep casting, comment it out and set
+# take_over_home in config.xml instead (see quirks): both then stay enabled.
 # com.google.android.apps.tv.launcherx
 com.google.android.tungsten.setupwraith  # setup wizard; its RecoveryActivity otherwise takes over Home

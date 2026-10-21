@@ -53,17 +53,89 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
 - **Chained `pm` commands** (`pm disable a; pm disable b`) may silently stop after the first. Run
   one per shell call; `--batch` does exactly that.
 - **Large pushes hang** through the Python client. Use `tools/b64push.py` for APKs.
+- **Every way of disabling a package is refused**, not just one. On a Fire TV Box 2015 (`sloane`,
+  Fire OS 5 / Android 5.1) `pm disable-user --user 0` returns `SecurityException`,
+  `pm uninstall --user 0` returns `DELETE_FAILED_INTERNAL_ERROR`, and `pm hide` reports success
+  while `pm list packages -d` stays empty ([#577](https://github.com/Gathin23/cleanyourtv/issues/577)).
+  Read `pm list packages -d` after each attempt instead of the exit code - `pm hide` is the one that
+  lies. When all three refuse, this firmware does not take a debloat list at all: there is no shell
+  route around it, sponsored rows stay on the home screen, and the only useful work left is the
+  TV's own privacy toggles plus DNS blocking (Pi-hole with a smart-TV ad list; the report used
+  Perflyst's `AmazonFireTV` list). Fire OS 6 is the opposite case: `pm disable-user` works and about
+  ten Amazon packages are protected, which
+  [`examples/amazon-fire-tv-stick-4k-2018/debloat.txt`](../examples/amazon-fire-tv-stick-4k-2018/debloat.txt)
+  lists, with the same DNS fallback for their endpoints.
+- **The Input key and CEC die after the hidden factory menu is opened**, seen on a Haier/CVTE set
+  (Durabrand `DURAT32ISDB`, `dupont`, Android TV 11 build `RTM6.230109.232`,
+  [#470](https://github.com/Gathin23/cleanyourtv/issues/470)). `com.cvte.tv.hkcfac` is the
+  manufacturer's production app: `dumpsys package` shows it as a factory component, and it has a
+  launchable activity, so "let me see what this package does" is enough to trigger it. Opening it
+  sets `customer_factory_mode=true` in `/vendor/tvcertificate/fdata.ini` and
+  `vendor.mtk.factory.disable.input=1`. The Input button then does nothing and HDMI-CEC is off, and
+  at the next boot `com.at.factory.factorymanager` disables Play services, Netflix,
+  `com.google.android.katniss` and `com.google.android.apps.mediashell` - `pm enable` from the shell
+  is refused for those, so casting and the store stay gone until the mode is cleared. Read the
+  package instead of starting it. If it has already been opened, start it, send the factory-exit
+  keycode twice **with it in front**, reboot, then turn CEC back on:
+  ```sh
+  tools/tv.py 'am start -n com.cvte.tv.hkcfac/.MainActivity'
+  tools/tv.py 'input keyevent 218; input keyevent 218'
+  tools/tv.py reboot
+  tools/tv.py 'settings put global hdmi_control_enabled 1'
+  ```
+  Press the real Input button afterwards and check the packages are back:
+  `tools/tv.py 'pm list packages -e | grep -E "gms|netflix|mediashell|katniss"'`. More on the unit in
+  the [device notes](devices/durabrand-durat32isdb.md).
 - **`adb exec-out screencap -p` gives a broken PNG** on some MediaTek sets (Xiaomi, and Amazon's
   own Fire TV smart TVs): the binary prints `Init wrapper sys mutex successful` on stdout first.
   Save on the TV and pull the file instead: `screencap -p /data/local/tmp/s.png`, or cut
-  everything before the `\x89PNG` header.
+  everything before the `\x89PNG` header. `tools/tv.py --screenshot shots/home.png` does the save,
+  the pull and the cleanup in one command, and says so when the capture is 0 bytes.
 - **Play Protect blocked the launcher** ("unsafe app blocked, built for an older version of Android")
   and `pm install` hung, then failed with `INSTALL_FAILED_VERIFICATION_FAILURE`, while it targeted
   SDK 29. It targets 34 now; if you built an old checkout, rebuild.
+- **`pm install` fails with `INSTALL_FAILED_OLDER_SDK`** on a set older than the launcher: the APK's
+  `minSdk` is a compile-time floor, so a TV on Android 7.0/7.1 (SDK 24/25) cannot take the published
+  build at all ([#576](https://github.com/Gathin23/cleanyourtv/issues/576)). Read both numbers before
+  changing anything: `tools/tv.py 'getprop ro.build.version.sdk'` and
+  `grep minSdk launcher/app/build.gradle` (26, i.e. Android 8.0, at the time of writing).
+  `launcher/build-and-install.sh` now asks the TV first and stops with both numbers, so nothing is
+  built or pushed for a set that will refuse it; `build-and-install.ps1` only reports it after
+  `pm install`, which fails safely with the stock launcher untouched. Lowering `minSdk` is a source
+  change, not a setting, and it means maintaining your own copy: the launcher uses AndroidX and
+  framework calls newer than API 25, so expect compile errors or a launcher that starts and then
+  crashes. An APK produced by rebuilding the project elsewhere (an assistant, an online builder, a
+  "rebuilt for API 25" zip from a forum) is not something this repository can check, and the install
+  scripts only push the APK they compiled themselves: a build signed with another key does not
+  install over this one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), so uninstall the old one first if you
+  go that way, and keep the stock launcher enabled until the new one really starts. On a set below
+  `minSdk` the debloat and privacy half still applies, from the TV's own home screen: it is the
+  launcher that cannot be installed, not the lists. If the `Failure [...]` line names
+  `INSTALL_FAILED_VERIFICATION_FAILURE` instead, that is the bullet above - the firmware's installer
+  verifier, not the API level.
 - **Screenshots come out empty** while Live TV, an HDMI input or Netflix is on screen, seen on TCL
   and a [Sony KDL-49W800G](https://github.com/Gathin23/cleanyourtv/issues/92). Press Home before
   `screencap`. An empty capture means nothing about the ADB connection or playback; check those
   separately.
+- **The whole UI is huge and clipped, and it is not the launcher**, seen on a Sony K-85XR70
+  (`BRAVIA 4K AE2`, Android 14, China firmware,
+  [#590](https://github.com/Gathin23/cleanyourtv/issues/590)). Its UI runs at 1920×1080 on a 4K panel
+  by design ([#29](https://github.com/Gathin23/cleanyourtv/issues/29)), and two confirmed boots came
+  up with an override density of 640 where 320 worked: everything doubles in size, tiles clip, and it
+  looks like a grid bug. Read the overrides before touching the layout:
+  ```sh
+  tools/tv.py 'wm size'          # Physical size vs Override size
+  tools/tv.py 'wm density'       # Physical density vs Override density
+  tools/tv.py 'settings --user 0 get secure display_density_forced'
+  ```
+  An `Override size` left behind by an old resolution experiment is the first thing to explain, and an
+  empty saved density is a normal Android default rather than damage. `wm density reset` fixes the
+  session; on this firmware it came back as 640 at the next boot, and `wm density 320` alone did not
+  stick because it left the saved setting empty. Put `settings --user 0 put secure
+  display_density_forced 320` after it, reboot, and read all three lines back before believing it.
+  Don't copy the number to another TV: record the three values first, and undo with `wm density reset`
+  plus `settings delete secure display_density_forced`. Device note:
+  [Sony K-85XR70](devices/sony-k85xr70-ae2.md).
 - **Disable the stock launcher only after the new one is installed**, or the Home button lands on
   a factory test app. Launch the replacement by hand first. `set-home-activity` can report
   `Success` while HOME still resolves to the stock launcher (priority 2) until that one is disabled.
@@ -88,7 +160,17 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   setupwraith's components is refused with a SecurityException. Disabling the whole
   `com.google.android.tungsten.setupwraith` package is what frees the slot. It is the first-run
   setup wizard, so everyday use is unaffected, but re-enable it before a factory reset - list it in
-  your `debloat.txt` and `tools/restore.sh` does that for you.
+  your `debloat.txt` and `tools/restore.sh` does that for you. Measured again on a Google TV
+  Streamer (`kirkwood`, `UTTK.260317.003`): a launcher built with `android:priority="3"` on its HOME
+  filter (`aapt2 dump xmltree` finds it in the installed APK) still has no `mPriority` line in
+  `dumpsys package`, and `cmd role get-role-holders android.app.role.HOME` names the new launcher
+  while the HOME key lands on `setupwraith/.RecoveryActivity` anyway. `cmd package resolve-activity`
+  and `query-activities` answer with the resolver table's winner, which is not necessarily the
+  activity that takes focus: `dumpsys activity activities | grep mFocusedApp` is the ground truth,
+  and it is what to check before saying the takeover worked. Where setupwraith has to stay (casting,
+  below), set `take_over_home` in `config.xml` instead: the stock launcher stays enabled, so
+  `RecoveryActivity` never gets Home, and `HomeKeyService` opens this launcher for the Home button and
+  whenever Android shows the stock home screen, while this launcher holds the HOME role.
 - **The TV drops off Wi-Fi for good the moment setupwraith is disabled**, seen on Google TV 14 (Sony
   BRAVIA 9 II, Philips R8G, Skyworth SWTV-24NA-4K NF, Xiaomi TV Box S 3rd gen MiTV-AFMU0) and on a TCL
   G07 on Google TV 11 (build AR17; on AR20 the network belonged to `android.uid.system`). A Wi-Fi
@@ -113,9 +195,35 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   `pm disable-user` on `setupwraith/.RecoveryActivity` is refused with `SecurityException: Shell
   cannot change component state`. So either debloat without setupwraith and launcherx, or re-enable
   setupwraith after each boot, wait for `ClientAuthSigner`, then disable it again: the receiver keeps
-  the credentials in memory, so casting survives until the next reboot. Reported on Google's own
-  Chromecast hardware so far; the Xiaomi Mi Box S 2nd gen list says casting from a Pixel still works
-  there with setupwraith off.
+  the credentials in memory, so casting survives until the next reboot - and only in that process.
+  `am force-stop com.google.android.apps.mediashell` followed by the receiver coming back prints
+  `Retry loading factory credentials` and `No private key, hence empty signature` again, so anything
+  that restarts it (a crash, a force-stop, an update) needs the same sequence. A third way keeps
+  casting and the new Home without that sequence: keep setupwraith and the stock launcher enabled and
+  set `take_over_home` in `config.xml` (tested on a Chromecast with Google TV 4K, UTTC.250917.004). On a
+  TV that was cleaned up before, `build-and-install.sh` enables the stock launcher first and setupwraith
+  after it. Don't stop halfway: setupwraith enabled with the stock launcher disabled is the crash loop
+  below, at the next restart if not sooner. `tools/restore.sh <list> <stock launcher>` hands the HOME
+  role back, which ends the takeover; `HomeKeyService` stays enabled but does nothing without the role. Reported on Google's
+  own Chromecast hardware (`boreal`) and, with the same log lines, on a Google TV Streamer
+  (`kirkwood`, `UTTK.260317.003`), where the `CastInfoProvider` also lives inside the setupwraith
+  APK; the Xiaomi Mi Box S 2nd gen list says casting from a Pixel still works there with
+  setupwraith off.
+- **Casting disappears although the Cast receiver is still running**, seen on a TCL 75QM751G (QM7,
+  Google TV 14) after its list, and the same "alive is not discoverable" conclusion on a TCL
+  BeyondTV2 (Android TV 9, R851T02 V660) in the same thread. Phones and a PC stop seeing the TV,
+  `com.google.android.apps.mediashell` is up and listening on 8008/8009, and there is no
+  `No private key` or `CastInfoProvider` line — so this is not the setupwraith case above, and
+  re-enabling setupwraith does not help. Check discovery instead of the process:
+  `tools/tv.py "logcat -d -s cast_shell | grep -E 'Done announcing|responses sent'"` and
+  `tools/tv.py "dumpsys activity service com.google.android.apps.mediashell | grep WargService"`.
+  A receiver that is advertising logs `MdnsAppFilter: Done announcing.`,
+  `responses sent in 60 seconds: N` and `Gcm.Register.Success=2`, with `WargService` up. If those are
+  missing while the process lives, the receiver is hung: the QM7 report saw its connections sitting
+  in `CLOSE_WAIT` on 8009 with unread data. `tools/tv.py "am force-stop
+  com.google.android.apps.mediashell"` restarts it (the TV starts it again on demand), and
+  advertising returned within seconds, without a reboot. Device notes:
+  [TCL 75QM751G](devices/tcl-75qm751g-qm7.md).
 - **The TV drops off Wi-Fi every minute right after the install**, seen on Google TV 14 (Xiaomi
   MiTV-MZTU0): the same setupwraith `.RecoveryActivity` took Home and system_server crash-looped
   on it. The install script now starts the new launcher before disabling the stock one, sets the
@@ -123,7 +231,12 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   Home resolves and re-enables the stock launcher if it is not the new one. Disable setupwraith as
   above. To confirm it is this bug: `logcat -b crash` shows `FATAL EXCEPTION IN SYSTEM PROCESS:
   android.display`, and the main log shows `setupwraith/.RecoveryActivity` being started every
-  200 ms or so. If you're already in the loop:
+  200 ms or so. On a Google TV Streamer (`kirkwood`, `UTTK.260317.003`) the same loop came with its
+  own signature - `IllegalArgumentException: positionChildAt: container=Task=... is not a child of
+  container=Task=1 current parent=null` at `WindowContainer.positionChildAt` /
+  `Task.moveToBack` / `TransitionController.tryStartCollectFromQueue` - and repeated roughly every
+  47 s, each cycle taking setupwraith and SystemUI down with `DeadSystemException` too. If you're
+  already in the loop:
   `tools/tv.py 'pm enable --user 0 com.google.android.apps.tv.launcherx'`.
 - **`theme.sh` fails with "couldn't create file: Permission denied"**, seen on TCL G07 (Android 11): the
   shell is not in the group that may write `Android/data`. `theme.sh` stages the files in
@@ -151,6 +264,27 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   package that also claims HOME (PatchWall on Xiaomi) makes Android drop the default. The install
   script now picks the known stock launcher among the candidates by itself; otherwise choose one on
   the TV or pass `STOCK_LAUNCHER=<package>`.
+- **Stremio fails every stream with `ConnectException: Failed to connect to /127.0.0.1:11470`**,
+  and only Force stop brings it back until the next reboot. This is not the debloat. It is a Stremio
+  regression in 1.11 ([stremio-bugs#2866](https://github.com/Stremio/stremio-bugs/issues/2866)):
+  `startServer()` only runs once the lifecycle is at least STARTED, so a process Android woke in the
+  background never starts the local server, and opening the app reuses that process. On a TV the
+  waker is Stremio's own `BootReceiver` refreshing the home-screen channels, so it happens on every
+  boot. Leaving the app and reopening does not help (same pid); any fresh process does, `am kill`
+  included. Keeping the boot-woken process from sticking around fixes it for good:
+  `tools/tv.py 'cmd appops set com.stremio.one RUN_ANY_IN_BACKGROUND ignore; cmd appops write-settings'`.
+  The second command is not optional: app-ops are written to disk lazily, and on a Vestel shandao set
+  the op was back to `allow` after the next reboot without it, which looks exactly like the
+  workaround not working. An app started in the foreground is unaffected, and the side effect, that
+  the home-screen channels only refresh while Stremio is open, costs nothing once the recommendation
+  rows are disabled anyway.
+- **A firmware update quietly undoes the cleanup.** The update installs over the cleaned-up system, so
+  every listed package is enabled again, Home goes back to the stock launcher and new preloads
+  appear that no list mentions. `tools/venv/bin/python -I tools/check.py <list>` reports the first
+  two and exits 1; `--fix` disables them again and puts the launcher back on Home. New preloads it
+  cannot know about, so after a big update compare `tools/tv.py 'pm list packages'` with the list
+  once by hand. On a TV whose list disables the updater, this only happens when you install an
+  update on purpose: enable the updater, update, `check.py --fix`, disable it again.
 
 ## Accessibility helper enabled but the remote button does nothing
 
@@ -167,6 +301,7 @@ tools/tv.py 'dumpsys accessibility'
 | Helper | Component in the enabled-services list | Key it filters |
 | --- | --- | --- |
 | Home button | `com.gathin.tvhome/.HomeKeyService` | `KEYCODE_ALL_APPS` (not an ordinary `KEYCODE_HOME`) |
+| Home takeover (`take_over_home`) | `com.gathin.tvhome/.HomeKeyService` | `KEYCODE_HOME`, while this launcher holds the HOME role and Android dispatches Home to the stock launcher |
 | Input button | `com.gathin.tvhome/.InputKeyService` | `KEYCODE_TV`, `KEYCODE_TV_INPUT`, plus the keycodes in `input_key_keycodes` and `app_keys` (`config.xml` or a theme) |
 
 - **Enabled** means the component is in that user's colon-separated list (the class may be written in
@@ -182,6 +317,16 @@ tools/tv.py 'dumpsys accessibility'
   to one app (on Google TV several go to launcherx, which is disabled), and Xiaomi firmware logs every
   press as `handleAction<keycode>` in `logcat`. Put it in `input_key_keycodes` (opens Inputs) or
   `app_keys` (`keycode:package`), reinstall with `INPUT_KEY_SERVICE=1` and press the real button.
+  A press that `logcat` reports as `KEY_UNKNOWN` or `KEY_PROGRAM` cannot be matched by keycode at all,
+  because every unmapped button shares those codes: use the Linux scancode from
+  `tools/tv.py 'getevent -lt'` in `settings_key_scancodes` and install with `HOME_KEY_SERVICE=1`
+  (an RC-36 remote sends its gear on scancode 240 and its notifications button on 362 that way; see
+  [the FPD CG50-C3 note](devices/fpd-cg50-c3.md)).
+
+A force-stop switches the helpers off for good: after `am force-stop com.gathin.tvhome` (or Force stop in
+Settings > Apps) Android removes the launcher's services from the enabled list, and they do not come back
+when the launcher starts again (seen on a TCL 55C715, Android TV 9). Enable them again the same way you did
+the first time, and avoid force-stopping the launcher while testing.
 
 Enabled but never bound points at a firmware restriction on auto-starting sideloaded services (some TCL
 builds log `OP_AUTO_START` denials). Look at `logcat` for the binding failure before changing settings,
@@ -189,6 +334,10 @@ and do not rewrite the enabled-services list or grant app-ops as a blanket fix. 
 TV 12) the line is `[TclAppBoot] ... calleeComponent = 'com.gathin.tvhome/.HomeKeyService', bootType =
 'bind_service', isAllow = 'false', reason = 'callee_does't_have_OP_AUTO_START_permission.'`, and
 `appops get com.gathin.tvhome` shows `APP_AUTO_START: ignore`. Allowing that one op for the launcher only
-(`appops set com.gathin.tvhome APP_AUTO_START allow`) made the service bind on its own after a restart;
-toggling the service off and on in Accessibility works until the next restart. When reporting, give the
+and saving it (`appops set com.gathin.tvhome APP_AUTO_START allow; appops write-settings`) made the service
+bind on its own after a restart; toggling the service off and on in Accessibility works until the next
+restart. App-ops reach the disk lazily: without `write-settings`, a restart soon after the `set` drops the
+change and the denial is back. Seen on a TCL C89B (Google TV 14, `G08`, `UTT2.250416.001 AU02`), whose log
+reads `[TclAppBoot]:forbid bind service ComponentInfo{com.gathin.tvhome/com.gathin.tvhome.HomeKeyService}`
+and whose `appops get` names the op `AUTO_START`: use the name `appops get` prints. When reporting, give the
 model, build, current user and the relevant redacted lines, not the raw dump.

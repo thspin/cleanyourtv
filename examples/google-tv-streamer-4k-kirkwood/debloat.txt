@@ -29,7 +29,9 @@
 #   (aapt2 shows android:priority=3) and the PackageManager still reports priority 0, even after a
 #   reboot. `cmd package set-home-activity` returns Success and does not change the dispatch either,
 #   and the HOME role holder is ignored. The HOME can only be taken by DISABLING setupwraith
-#   (package level).
+#   (package level). To keep casting instead, keep setupwraith and launcherx enabled and set
+#   take_over_home in config.xml (docs/TROUBLESHOOTING.md): HomeKeyService then opens the launcher for
+#   Home. Tested on a Chromecast with Google TV 4K with the same setupwraith; not yet on this device.
 # - pm hide is not an alternative: `pm hide com.google.android.tungsten.setupwraith` fails with
 #   "SecurityException: Neither user 2000 nor current process has android.permission.MANAGE_USERS".
 # - Consequence for the Cast: with setupwraith disabled the receiver keeps the credentials in MEMORY
