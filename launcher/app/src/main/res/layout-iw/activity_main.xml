@@ -4,7 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF000000">
+    android:background="@color/glass_base">
 
     <!-- Time-of-day backdrop, drawn once a minute (config.xml sky_intensity; 0 keeps it hidden).
          Keep in step with layout/activity_main.xml: every view there must exist here too. -->
@@ -103,6 +103,17 @@
         android:visibility="gone"
         android:importantForAccessibility="no" />
 
+    <!-- A light darkening at the top, so the greeting and the date keep their contrast over a
+         bright part of the photo without flattening it. -->
+    <View
+        android:id="@+id/scrimTop"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:layout_gravity="top"
+        android:background="@drawable/scrim_top"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
     <!-- Top shelf: the focused dock app's name, positioned above the dock in code. -->
     <LinearLayout
         android:id="@+id/hero"
@@ -176,9 +187,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingStart="56dp"
-        android:paddingEnd="56dp"
-        android:paddingTop="26dp"
+        android:paddingStart="@dimen/screen_margin"
+        android:paddingEnd="@dimen/screen_margin"
+        android:paddingTop="@dimen/header_top"
         android:paddingBottom="62dp"
         android:clipChildren="false"
         android:clipToPadding="false">
@@ -208,8 +219,8 @@
                     android:singleLine="true"
                     android:ellipsize="end"
                     android:includeFontPadding="false"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="44sp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/greeting_size"
                     android:fontFamily="@font/outfit_light"
                     android:letterSpacing="-0.02" />
 
@@ -220,11 +231,11 @@
                     android:gravity="right"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/space_sm"
                     android:singleLine="true"
                     android:ellipsize="end"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="18sp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/date_size"
                     android:fontFamily="@font/outfit_light"
                     android:letterSpacing="0" />
 
@@ -245,102 +256,88 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Weather for the place the launcher is set to (Weather/WeatherClient), mirrored: on the left. -->
+            <!-- Weather for the place the launcher is set to (Weather/WeatherClient), mirrored: on the left.
+                 Stacked, so the condition, the temperature and the clock each get a line of their own. -->
             <LinearLayout
                 android:id="@+id/weatherCard"
-                android:layout_width="330dp"
-                android:layout_height="112dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
                 android:layout_alignTop="@id/leftBlock"
                 android:background="@drawable/weather_card_bg"
                 android:orientation="vertical"
-                android:padding="16dp"
+                android:padding="18dp"
                 android:focusable="false"
                 android:importantForAccessibility="no">
 
+                <TextView
+                    android:id="@+id/weatherPlace"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="right"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:text="Buenos Aires"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:fontFamily="@font/outfit_medium" />
+
+                <TextView
+                    android:id="@+id/weatherCondition"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:gravity="right"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:text="\u2014"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/outfit_light" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:gravity="bottom">
 
-                    <LinearLayout
+                    <TextClock
+                        android:id="@+id/weatherClock"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="bottom">
+                        android:layout_marginEnd="14dp"
+                        android:singleLine="true"
+                        android:format12Hour="h:mm"
+                        android:format24Hour="HH:mm"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="20sp"
+                        android:fontFamily="@font/outfit_light"
+                        android:includeFontPadding="false" />
 
-                        <TextClock
-                            android:id="@+id/weatherClock"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            android:singleLine="true"
-                            android:format12Hour="h:mm"
-                            android:format24Hour="HH:mm"
-                            android:textColor="#D9FFFFFF"
-                            android:textSize="40sp"
-                            android:fontFamily="@font/outfit_light"
-                            android:letterSpacing="-0.03"
-                            android:includeFontPadding="false" />
-
-                        <TextView
-                            android:id="@+id/weatherTemp"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:singleLine="true"
-                            android:text="--°"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="40sp"
-                            android:fontFamily="@font/outfit_light"
-                            android:letterSpacing="-0.03"
-                            android:includeFontPadding="false" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/weatherTemp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/weatherPlace"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="right"
-                            android:singleLine="true"
-                            android:ellipsize="end"
-                            android:text="Buenos Aires"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="18sp"
-                            android:fontFamily="@font/outfit_regular" />
-
-                        <TextView
-                            android:id="@+id/weatherCondition"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:gravity="right"
-                            android:singleLine="true"
-                            android:ellipsize="end"
-                            android:text="\u2014"
-                            android:textColor="#B3FFFFFF"
-                            android:textSize="14sp"
-                            android:fontFamily="@font/outfit_light" />
-                    </LinearLayout>
+                        android:singleLine="true"
+                        android:text="--\u00B0"
+                        android:textColor="@color/accent_warm"
+                        android:textSize="34sp"
+                        android:fontFamily="@font/outfit_light"
+                        android:letterSpacing="-0.02"
+                        android:includeFontPadding="false" />
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/weatherAttribution"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
                     android:gravity="start"
                     android:singleLine="true"
-                    android:text="Open-Meteo · CC BY 4.0"
-                    android:textColor="#59FFFFFF"
-                    android:textSize="8sp"
+                    android:text="@string/weather_attribution"
+                    android:textColor="@color/text_tertiary"
+                    android:textSize="9sp"
                     android:fontFamily="@font/outfit_regular" />
             </LinearLayout>
 
@@ -460,6 +457,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/ic_input"
+                android:tint="@drawable/pill_text"
                 android:importantForAccessibility="no" />
 
             <TextView
@@ -490,6 +488,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/ic_swap_vert"
+                android:tint="@drawable/pill_text"
                 android:importantForAccessibility="no" />
 
             <TextView
@@ -520,6 +519,7 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/ic_picture"
+                android:tint="@drawable/pill_text"
                 android:importantForAccessibility="no" />
 
             <TextView

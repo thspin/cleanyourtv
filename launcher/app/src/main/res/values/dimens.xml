@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home screen's spacing ladder and its sizes. Every gap between the greeting, the weather
+  card, the app row and the action row is a step of this ladder, so the screen reads as one
+  composition instead of a pile of parts that happen to sit next to each other.
+-->
+<resources>
+
+    <!-- The ladder: 4 / 8 / 16 / 24 / 32 dp. -->
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_sm">8dp</dimen>
+    <dimen name="space_md">16dp</dimen>
+    <dimen name="space_lg">24dp</dimen>
+    <dimen name="space_xl">32dp</dimen>
+
+    <!-- The screen's frame -->
+    <dimen name="screen_margin">56dp</dimen>
+    <dimen name="header_top">40dp</dimen>
+    <dimen name="action_row_bottom">12dp</dimen>
+
+    <!-- Type -->
+    <dimen name="greeting_size">44sp</dimen>
+    <dimen name="date_size">15sp</dimen>
+    <dimen name="label_size">14sp</dimen>
+
+    <!-- Corners: a card, a button and the glass bar, in that order. -->
+    <dimen name="card_radius">16dp</dimen>
+    <dimen name="button_radius">12dp</dimen>
+    <dimen name="bar_radius">20dp</dimen>
+    <dimen name="tile_radius">16dp</dimen>
+
+    <!-- An app tile is a square: the artwork is cropped to 1:1, never stretched. -->
+    <dimen name="tile_size">108dp</dimen>
+
+</resources>

@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One app tile: a square with the app's logo filling it, cropped to 1:1 and never stretched.
+  The artwork is centred by the ImageView, so a wide banner loses its edges rather than its
+  proportions: every tile in the row is the same size and the same shape.
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -9,59 +14,44 @@
 
     <FrameLayout
         android:id="@+id/card"
-        android:layout_width="180dp"
-        android:layout_height="101dp"
+        android:layout_width="108dp"
+        android:layout_height="108dp"
         android:layout_gravity="center_horizontal|top"
         android:background="@drawable/tile_bg"
         android:focusable="true"
         android:clickable="true">
 
+        <!-- The artwork, fitted whole inside the square: a logo is never cropped. fitCenter and not
+             centerInside, because centerInside never enlarges a drawable and the icons came out small. -->
         <ImageView
             android:id="@+id/banner"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="centerCrop"
+            android:scaleType="fitCenter"
             android:contentDescription="@null" />
 
+        <!-- The icon, for an app with no banner of its own. -->
         <ImageView
             android:id="@+id/icon"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="center"
-            android:layout_marginBottom="14dp"
-            android:visibility="gone"
-            android:contentDescription="@null" />
-
-        <TextView
-            android:id="@+id/label"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="8dp"
-            android:gravity="center"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:fontFamily="@font/outfit"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@null"
             android:visibility="gone" />
     </FrameLayout>
 
     <TextView
         android:id="@+id/name"
-        android:layout_width="180dp"
+        android:layout_width="108dp"
         android:layout_height="22dp"
         android:layout_gravity="center_horizontal|top"
-        android:layout_marginTop="108dp"
+        android:layout_marginTop="116dp"
         android:gravity="center"
         android:singleLine="true"
         android:ellipsize="end"
         android:alpha="0"
-        android:translationY="-6dp"
-        android:textColor="#F2FFFFFF"
-        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/label_size"
         android:fontFamily="@font/outfit_medium"
         android:letterSpacing="0.02" />
 </FrameLayout>

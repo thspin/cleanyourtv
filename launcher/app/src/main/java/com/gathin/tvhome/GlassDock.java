@@ -28,6 +28,12 @@ import android.widget.ImageView;
  * tree. Drawing the view meant fighting the canvas transform conventions (scale-then-translate and
  * post-multiply disagree about which side the translation lands on) and the centre-crop matrix the
  * image view applies on top; sampling the bitmap with the same arithmetic is plain and checkable.
+ *
+ * What sits on top of that frost is the same glass every other surface of the screen carries: a
+ * neutral charcoal slab, five percent of warm white over it and a hairline warm rim. The earlier
+ * version painted a strong white fill and a bright specular on top of the frost, which lifted the
+ * picture out of the band and left a flat grey plate sitting on the backdrop: the band read as
+ * brighter than the screen around it and carried none of the picture's colour.
  */
 public class GlassDock extends View {
 
@@ -40,10 +46,11 @@ public class GlassDock extends View {
     private static final int CAPTURE_W = 64;
 
     private final Paint backdrop = new Paint(Paint.FILTER_BITMAP_FLAG);
-    private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint specular = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** The glass body: the neutral charcoal over the frost. */
+    private final Paint body = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** The warm white over the glass: five percent, the same as on every other surface. */
+    private final Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final RectF dest = new RectF();
     private final Rect src = new Rect();
@@ -64,11 +71,14 @@ public class GlassDock extends View {
     public GlassDock(Context context, android.util.AttributeSet attrs) {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
-        radius = 26f * density;
+        radius = 20f * density;
+        // The glass body: charcoal, denser at the top of the band, so the band has a direction.
+        body.setShader(new LinearGradient(0, 0, 0, 1, 0x8C141518, 0x70141518, Shader.TileMode.CLAMP));
+        // Five percent of warm white over the glass.
+        sheen.setColor(0x0DF5F0EA);
         rim.setStyle(Paint.Style.STROKE);
-        rim.setStrokeWidth(1.5f * density);
-        rim.setColor(0xCCFFFFFF);
-        glow.setStyle(Paint.Style.STROKE);
+        rim.setStrokeWidth(1f * density);
+        rim.setColor(0x47F5F0EA);
         // No hardware layer: this band never moves, so caching it as a texture would only add an
         // offscreen buffer. GlassView needs one because a spring drags it around; this one does not.
     }
@@ -101,22 +111,22 @@ public class GlassDock extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        fill.setShader(new LinearGradient(0, 0, 0, h, 0x3DFFFFFF, 0x12FFFFFF, Shader.TileMode.CLAMP));
-        specular.setShader(new LinearGradient(0, 0, 0, h * 0.45f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        // The gradient runs over the band's own height, so it has to be rebuilt when that changes.
+        body.setShader(new LinearGradient(0, 0, 0, h, 0x8C141518, 0x70141518, Shader.TileMode.CLAMP));
         sourceDirty = true;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        float inset = 6f * density;   // room for the glow, same as GlassView
-        rect.set(inset, inset, getWidth() - inset, getHeight() - inset);
+        rect.set(0, 0, getWidth(), getHeight());
 
         if (sourceDirty) {
             sourceDirty = false;
             rebuild();
         }
 
-        // Frosted backdrop, clipped to the slab so the picture does not square off the corners.
+        // 1. The frosted backdrop: the picture behind the band, blurred, with the legibility scrim
+        //    already baked in. This is what makes the band glass and not a plate.
         if (frosted != null && !frosted.isRecycled()) {
             canvas.save();
             canvas.clipRect(rect);
@@ -126,23 +136,18 @@ public class GlassDock extends View {
             canvas.restore();
         }
 
-        // Outer glow: three widening, fading strokes.
-        for (int i = 1; i <= 3; i++) {
-            glow.setStrokeWidth(i * 2f * density);
-            glow.setColor((0x30 / i) << 24 | 0xFFFFFF);
-            float o = i * density;
-            canvas.drawRoundRect(rect.left - o, rect.top - o, rect.right + o, rect.bottom + o, radius + o, radius + o, glow);
-        }
+        // 2. The glass body over it: neutral charcoal, so a burgundy backdrop keeps its colour in
+        //    the picture instead of tinting the whole band.
+        canvas.drawRoundRect(rect, radius, radius, body);
 
-        canvas.drawRoundRect(rect, radius, radius, fill);
+        // 3. The warm white over the glass.
+        canvas.drawRoundRect(rect, radius, radius, sheen);
 
-        // Specular over the top 45%: clipRect stays on the GPU (clipPath did not on this hardware), as GlassView notes.
-        canvas.save();
-        canvas.clipRect(rect.left, rect.top, rect.right, rect.top + rect.height() * 0.45f);
-        canvas.drawRoundRect(rect, radius, radius, specular);
-        canvas.restore();
-
-        canvas.drawRoundRect(rect, radius, radius, rim);
+        // 4. The hairline edge, drawn just inside the band so it is not half clipped away.
+        RectF edge = new RectF(rect);
+        float half = rim.getStrokeWidth() / 2f;
+        edge.inset(half, half);
+        canvas.drawRoundRect(edge, radius - half, radius - half, rim);
     }
 
     /**
@@ -200,7 +205,8 @@ public class GlassDock extends View {
     /**
      * The image view that is actually on screen. The wallpaper player crossfades between two image views,
      * and the one fading out is still opaque for a moment, so the most opaque one is the visible one and
-     * the last one wins a tie because that is the one drawn on top.
+     * the last one wins a tie because that is the one drawn on top. A view that is fully transparent is
+     * not on screen at all and is never picked.
      */
     private ImageView picture() {
         if (!(sourceRoot instanceof android.view.ViewGroup)) return null;
@@ -212,7 +218,9 @@ public class GlassDock extends View {
             if (child == this || !(child instanceof ImageView)) continue;
             ImageView image = (ImageView) child;
             if (image.getDrawable() == null || image.getWidth() <= 0) continue;
+            if (image.getVisibility() != View.VISIBLE) continue;
             float alpha = image.getAlpha();
+            if (alpha <= 0.02f) continue;   // not on screen
             if (alpha >= bestAlpha) {
                 bestAlpha = alpha;
                 best = image;

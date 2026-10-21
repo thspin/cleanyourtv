@@ -303,7 +303,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sourcePanelAction = cfg.sourcePanelAction;
 
         root = findViewById(R.id.root);
-        root.setBackgroundColor(cfg.backgroundColor);
+        // The root carries the palette's charcoal as its fallback, so the frames before the wallpaper
+        // finishes decoding are a dark surface and not a black hole. A theme that asks for a colour of
+        // its own still gets it.
+        int backdrop = cfg.backgroundColor == Color.BLACK
+                ? getResources().getColor(R.color.glass_base, null) : cfg.backgroundColor;
+        root.setBackgroundColor(backdrop);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
@@ -449,7 +454,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // Item height follows the tile size, which follows the columns and the rows that must fit (AppAdapter.tileWidthPx).
             int inner = (r - l) - grid.getPaddingLeft() - grid.getPaddingRight();
             int tileW = AppAdapter.tileWidthPx(inner, h, COLUMNS, rowsBelowDock, cfg.dockTitle, cfg.dockRow, density);
-            int itemH = AppAdapter.itemHeightPx(AppAdapter.tileHeightPx(tileW), density);
+            int itemH = AppAdapter.itemHeightPx(AppAdapter.tileHeightPx(tileW), cfg.dockRow, density);
             int dockRow = itemH + (int) (AppAdapter.DOCK_EXTRA_DP * density);   // item height plus DockDecoration offsets
             int gridRows = itemH * rowsBelowDock;
             // Keep the hero below the header when the library is enabled on a short screen,
@@ -755,6 +760,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onPause() {
         super.onPause();
+        WeatherClient.cancel();   // drop a fetch still in flight; its answer must not land on a paused Home
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
         stopAmbientAnimation();
@@ -1125,7 +1131,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         float w = card.getWidth() * scale + 2 * pad;
         float h = card.getHeight() * scale + 2 * pad;
         float x = r.exactCenterX() - w / 2f;
-        float y = r.exactCenterY() - h / 2f - (advancedEffects ? 4f * density : 0f);
+        float y = r.exactCenterY() - h / 2f;
 
         ViewGroup.LayoutParams lp = glass.getLayoutParams();
         if (lp.width != (int) w || lp.height != (int) h || card.getWidth() != glassCardW) {
@@ -1250,7 +1256,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 || ((FrameLayout.LayoutParams) dockGlass.getLayoutParams()).leftMargin != lp.leftMargin
                 || ((FrameLayout.LayoutParams) dockGlass.getLayoutParams()).topMargin != lp.topMargin;
         if (moved) dockGlass.setLayoutParams(lp);
-        dockGlass.setCornerRadius(26 * density);
+        dockGlass.setCornerRadius(20 * density);
         if (dockGlass.getVisibility() != View.VISIBLE) dockGlass.setVisibility(View.VISIBLE);
         // Recapture only when the slab actually moved: build() blurs on the CPU, and a rebuild per layout
         // pass cost ~20 ms a frame with no visual change to show for it.
@@ -2223,16 +2229,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             weatherPlace.setText(R.string.weather_dash);
             weatherCondition.setText(R.string.weather_dash);
             weatherTemp.setText(R.string.weather_loading);
-            weatherTemp.setTextColor(0x66FFFFFF);
+            weatherTemp.setTextColor(0x59F5F0EA);
             return;
         }
         weatherPlace.setText(w.place);
         weatherCondition.setText(w.condition);
         String degrees = Math.round(w.temperatureC) + "°";
         weatherTemp.setText(degrees);
-        weatherTemp.setTextColor(0xFFFFFFFF);
-        // Five characters ("-12°" or "100°") overflow 40sp at 284dp; step down once.
-        weatherTemp.setTextSize(degrees.length() > 4 ? 34f : 40f);
+        weatherTemp.setTextColor(0xFFFF8A6B);
+        // Five characters ("-12°" or "100°") overflow 34sp; step down once.
+        weatherTemp.setTextSize(degrees.length() > 4 ? 28f : 34f);
     }
 
     /** Switches to a passthrough input (HDMI, AV). The standard way is ACTION_VIEW on its channel URI,

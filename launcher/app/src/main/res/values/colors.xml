@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home screen's palette, in one place. Nothing else hard-codes a colour: the drawables and
+  the layout all point here, so a change of tone is one edit instead of a hunt.
+
+  The type is a warm white (#F5F0EA) rather than pure white: on a dark, warm backdrop pure
+  white reads cold and slightly blown out. The glass is a neutral charcoal (#141518): the
+  backdrop behind it may be burgundy, and a neutral slab keeps that colour in the photo
+  instead of tinting the whole band.
+-->
+<resources>
+
+    <!-- Type -->
+    <color name="text_primary">#F5F0EA</color>
+    <color name="text_secondary">#99F5F0EA</color>
+    <color name="text_tertiary">#59F5F0EA</color>
+    <color name="text_disabled">#33F5F0EA</color>
+
+    <!-- Glass: a charcoal slab, a hairline warm rim and a whisper of warm white on top. -->
+    <color name="glass_base">#141518</color>
+    <color name="glass_fill">#B3141518</color>
+    <color name="glass_rim">#47F5F0EA</color>
+    <color name="glass_rim_strong">#8CF5F0EA</color>
+    <color name="glass_sheen">#0DF5F0EA</color>
+
+    <!-- Focus: one thin, bright stroke, the same on every element that can take the focus. -->
+    <color name="focus_ring">#F5F0EA</color>
+
+    <!-- The one accent on the screen: the temperature. -->
+    <color name="accent_warm">#FF8A6B</color>
+
+</resources>

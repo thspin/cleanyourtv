@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A soft darkening at the top of the screen, so the greeting and the date keep their contrast
+  over a bright part of the photo. Deliberately light: the top of the backdrop is where the
+  picture is at its best, and a heavy scrim would flatten it.
+  angle 270 runs top to bottom, so startColor sits at the top edge.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#66000000"
+        android:centerColor="#26000000"
+        android:endColor="#00000000"
+        android:type="linear" />
+</shape>

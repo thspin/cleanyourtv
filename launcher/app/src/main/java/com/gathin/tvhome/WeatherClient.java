@@ -112,6 +112,7 @@ final class WeatherClient {
     /** The last good reading, or {@link Weather#empty()} when none was saved yet. */
     static Weather cached(Context context) {
         SharedPreferences preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        if (!preferences.contains(FETCHED_KEY) || !preferences.contains(TEMP_KEY)) return Weather.empty();
         long fetched = preferences.getLong(FETCHED_KEY, 0);
         if (fetched <= 0) return Weather.empty();
         double temp = Double.longBitsToDouble(preferences.getLong(TEMP_KEY, 0));

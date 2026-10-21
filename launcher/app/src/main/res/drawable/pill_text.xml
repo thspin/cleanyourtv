@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The pill's label: dim while the pill is idle, warm white once it has the focus. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true" android:color="#FF111111" />
-    <item android:color="#FFFFFFFF" />
+    <item android:state_focused="true" android:color="@color/text_primary" />
+    <item android:color="@color/text_secondary" />
 </selector>

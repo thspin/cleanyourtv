@@ -102,7 +102,7 @@
          enables both, gives this launcher the HOME role and turns on HomeKeyService, which opens this
          launcher for the Home key and whenever Android shows the stock home screen. Read at build and
          install time only, not from a theme. Off everywhere else. -->
-    <bool name="take_over_home">false</bool>
+    <bool name="take_over_home">true</bool>
 
     <!-- Show the Solar Hijri (Shamsi) date used in Iran and Afghanistan, e.g. "27 Mehr 1405", above the
          Gregorian date. -->

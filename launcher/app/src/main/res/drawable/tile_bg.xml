@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#FF1C1C1E" />
-    <corners android:radius="16dp" />
+<!--
+  The tile behind an app's logo: a charcoal square with a hairline warm rim, the same glass as
+  the rest of the screen. It shows through the transparent parts of an icon and keeps the tile
+  from being a hole in the backdrop.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#D1141518" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/glass_rim" />
+    <corners android:radius="@dimen/tile_radius" />
 </shape>

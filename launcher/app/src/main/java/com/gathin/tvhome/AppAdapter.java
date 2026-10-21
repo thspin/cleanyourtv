@@ -88,24 +88,36 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
     }
 
-    static final float FOCUS_SCALE = 1.10f;
-    /** Design size of a tile (dp); tiles shrink from here when the columns don't fit, see tileWidthPx. */
-    static final float DESIGN_W_DP = 180f, DESIGN_H_DP = 101f;
+    /** The focus zoom. There is none: the ring and the shadow mark the focused tile. */
+    static final float FOCUS_SCALE = 1f;
+    /**
+     * Design size of a tile (dp). Tiles shrink from here when the columns don't fit, see tileWidthPx.
+     * A tile is a square: the app's logo is cropped to 1:1 and never stretched, so every tile in a
+     * row is the same shape and the same size.
+     */
+    static final float DESIGN_W_DP = 108f, DESIGN_H_DP = 108f;
+    /** The plain grid (dock_row false) keeps the roomier design size. */
+    static final float GRID_DESIGN_DP = 180f;
 
     /**
      * Tile width for a grid of this inner width: the cell minus room for the focus zoom and the glass
-     * highlight, capped at the design size so 4 columns on a 1080p TV look exactly as before.
+     * highlight, capped at the design size.
      */
     static int tileWidthPx(int innerWidthPx, int columns, float density) {
-        int design = Math.round(DESIGN_W_DP * density);
-        if (innerWidthPx <= 0 || columns <= 0) return design;
-        int cell = innerWidthPx / columns;
-        int fit = (int) ((cell - 12 * density) / FOCUS_SCALE);
-        return Math.max(Math.round(80 * density), Math.min(design, fit));
+        return tileWidthPx(innerWidthPx, columns, density, true);
     }
 
+    static int tileWidthPx(int innerWidthPx, int columns, float density, boolean dockRow) {
+        float design = (dockRow ? DESIGN_W_DP : GRID_DESIGN_DP) * density;
+        if (innerWidthPx <= 0 || columns <= 0) return Math.round(design);
+        int cell = innerWidthPx / columns;
+        int fit = (int) ((cell - 12 * density) / FOCUS_SCALE);
+        return Math.max(Math.round(80 * density), Math.min(Math.round(design), fit));
+    }
+
+    /** A tile is a square: its height is its width. */
     static int tileHeightPx(int tileWidthPx) {
-        return Math.round(tileWidthPx * DESIGN_H_DP / DESIGN_W_DP);
+        return tileWidthPx;
     }
 
     /** Height of one grid item: the tile, the name label under it and the item's own padding. */
@@ -120,14 +132,16 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     /**
      * dock_row false: 4dp padding above and below, a 4dp gap and a 20dp name label, and 16dp kept under the last
-     * row. The plain grid fits more rows on the screen, and with item_app.xml's roomier spacing the tiles came
-     * out small with wide gaps between them.
+     * row. The plain grid fits more rows on the screen.
      */
     static final float COMPACT_ITEM_EXTRA_DP = 4 + 4 + 4 + 20;
     static final float COMPACT_BOTTOM_ROOM_DP = 16;
 
-    /** item_app.xml: 8dp padding above and below, a 7dp gap and the 22dp name label under the tile. */
-    static final float ITEM_EXTRA_DP = 45;
+    /**
+     * The dock row: the tile and its own padding, and nothing else. That row shows no names, so the
+     * band stays as slim as the icons in it.
+     */
+    static final float ITEM_EXTRA_DP = 8 + 8;
     /** DockDecoration's offsets above and below the dock row. */
     static final float DOCK_EXTRA_DP = 6 + 12;
     /** Room kept under the last row rows_below_dock asks for (MainActivity places the dock with the same). */
@@ -146,13 +160,13 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
      */
     static int tileWidthPx(int innerWidthPx, int gridHeightPx, int columns, int rowsBelowDock, boolean dockTitle,
                            boolean dockRow, float density) {
-        int w = tileWidthPx(innerWidthPx, columns, density);
+        int w = tileWidthPx(innerWidthPx, columns, density, dockRow);
         if (gridHeightPx <= 0 || rowsBelowDock <= 0) return w;
         float reserved = (dockRow ? DOCK_EXTRA_DP + BOTTOM_ROOM_DP + (dockTitle ? TITLE_ROOM_DP : 0)
                 : TOP_ROOM_DP + COMPACT_BOTTOM_ROOM_DP) * density;
         float perItem = (gridHeightPx - reserved) / (rowsBelowDock + 1);
         float tileH = perItem - (dockRow ? ITEM_EXTRA_DP : COMPACT_ITEM_EXTRA_DP) * density;
-        int byHeight = Math.round(tileH * DESIGN_W_DP / DESIGN_H_DP);
+        int byHeight = Math.round(tileH);   // a tile is a square: its height is its width
         // Shrink at most to MIN_HEIGHT_FIT of the width-only size. Below that the tiles look lost in their wide
         // columns (2 rows under a titled dock came out at 80dp); the rows that still don't fit run off the bottom
         // and scroll, and MainActivity keeps the title's room above the dock.
@@ -366,9 +380,13 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         View name = v.findViewById(R.id.name);
         ViewGroup.MarginLayoutParams nameLp = (ViewGroup.MarginLayoutParams) name.getLayoutParams();
         nameLp.width = w;
-        nameLp.topMargin = h + Math.round((dockRow ? 7 : 4) * density);
-        if (!dockRow) {
-            // Compact spacing (COMPACT_ITEM_EXTRA_DP): 4dp item padding and a 20dp name instead of 8dp and 22dp.
+        if (dockRow) {
+            // The dock row shows no names: the icon says which app it is, and the band stays as slim
+            // as the icons in it.
+            nameLp.topMargin = 0;
+            nameLp.height = 0;
+        } else {
+            nameLp.topMargin = h + Math.round(4 * density);
             nameLp.height = Math.round(20 * density);
             int pad = Math.round(4 * density);
             v.setPadding(v.getPaddingLeft(), pad, v.getPaddingRight(), pad);
@@ -396,28 +414,17 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         h.card.setVisibility(View.VISIBLE);
         h.card.setFocusable(true);
         h.name.setText(e.name);
-        h.name.setVisibility(dockRow && position < dockSize ? View.INVISIBLE : View.VISIBLE);   // the dock has no labels
+        h.name.setVisibility(dockRow && position < dockSize ? View.GONE : View.VISIBLE);   // the dock has no labels
         boolean focused = h.card.isFocused();   // a rebind after reload() can hit the focused tile
         h.name.setAlpha(focused ? 1f : 0f);
         h.card.setScaleX(focused && animations ? focusScale() : 1f);
         h.card.setScaleY(focused && animations ? focusScale() : 1f);
-        h.card.setTranslationY(focused && advancedEffects ? -4f * ctx.getResources().getDisplayMetrics().density : 0f);
-        h.card.setTranslationZ(focused && advancedEffects ? 8f * ctx.getResources().getDisplayMetrics().density : 0f);
-        h.banner.setScaleX(focused && advancedEffects ? 1.035f : 1f);
-        h.banner.setScaleY(focused && advancedEffects ? 1.035f : 1f);
-        if (e.banner != null) {
-            h.banner.setImageDrawable(e.banner);
-            h.banner.setVisibility(View.VISIBLE);
-            h.icon.setVisibility(View.GONE);
-            h.label.setVisibility(View.GONE);
-        } else {
-            h.banner.setImageDrawable(null);
-            h.banner.setVisibility(View.GONE);
-            h.icon.setImageDrawable(e.icon);
-            h.icon.setVisibility(View.VISIBLE);
-            h.label.setText(e.label);
-            h.label.setVisibility(View.VISIBLE);
-        }
+        h.card.setTranslationZ(focused ? 10f * ctx.getResources().getDisplayMetrics().density : 0f);
+        // The artwork: the app's own logo, fitted whole inside the square. A 16:9 banner cropped to a
+        // square loses the edges of its logo, so the icon is what the tile shows.
+        h.banner.setVisibility(View.GONE);
+        h.icon.setVisibility(View.VISIBLE);
+        h.icon.setImageDrawable(e.icon != null ? e.icon : e.banner);
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
             Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + e.pkg));
@@ -562,8 +569,13 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         return e.banner != null ? e.banner : e.icon;
     }
 
-    float focusScale() {
-        return !animations ? 1f : advancedEffects ? 1.12f : 1.10f;
+    /**
+     * The focus zoom. There is none: the focused tile is told apart by the ring around it and by the
+     * shadow under it, and a card that grows has to be re-rasterised inside its clip on every frame
+     * of the animation.
+     */
+    static float focusScale() {
+        return 1f;
     }
 
     /** A vivid colour sampled from the app's banner (or icon), cached per entry; a card's accent when it set one. */
@@ -628,7 +640,6 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final View card;
         final ImageView banner;
         final ImageView icon;
-        final TextView label;
         final TextView name;
         final boolean animations;
         final boolean advancedEffects;
@@ -640,7 +651,6 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             card = v.findViewById(R.id.card);
             banner = v.findViewById(R.id.banner);
             icon = v.findViewById(R.id.icon);
-            label = v.findViewById(R.id.label);
             name = v.findViewById(R.id.name);
             this.animations = animations;
             this.advancedEffects = advancedEffects;
@@ -666,45 +676,33 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
             card.setOnFocusChangeListener((view, focused) -> {
                 view.animate().cancel();
-                banner.animate().cancel();
                 name.animate().cancel();
-                float scale = !animations ? 1f : advancedEffects ? 1.12f : 1.10f;
-                float s = focused ? scale : 1f;
+                // The focus reads as a thin bright ring (GlassView springs it to this tile) and a soft
+                // shadow under the tile. The tile itself does not grow: a scaled card has to be
+                // re-rasterised inside its clip on every frame of the animation, and that alone took
+                // the home screen from 0.77% janky frames to 31%.
+                float lift = focused ? 10f * density : 0f;
                 if (!animations) {
                     view.setScaleX(1f);
                     view.setScaleY(1f);
                     view.setTranslationY(0f);
-                    view.setTranslationZ(0f);
-                    banner.setScaleX(1f);
-                    banner.setScaleY(1f);
+                    view.setTranslationZ(lift);
                     name.setAlpha(focused ? 1f : 0f);
                     name.setTranslationY(0f);
                 } else if (reducedMotion) {
-                    view.animate().scaleX(s).scaleY(s)
-                            .translationY(focused && advancedEffects ? -4f * density : 0f)
-                            .translationZ(focused && advancedEffects ? 8f * density : 0f)
-                            .setDuration(focused ? 120 : 80)
-                            .setInterpolator(new DecelerateInterpolator())
-                            .withLayer().start();
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    view.setTranslationY(0f);
+                    view.setTranslationZ(lift);
                     name.animate().alpha(focused ? 1f : 0f).setDuration(100).start();
-                    // Same place as the full motion's slide ends: the layout's -6dp is only its starting point, and
-                    // left there the name overlaps the zoomed tile.
-                    // Only on focus: snapping it back to -6dp while it fades out would jump it up over the tile.
-                    if (focused) name.setTranslationY(density * 4f);
                 } else {
-                    view.animate().scaleX(s).scaleY(s)
-                            .translationY(focused && advancedEffects ? -4f * density : 0f)
-                            .translationZ(focused && advancedEffects ? 8f * density : 0f)
-                            .setDuration(advancedEffects ? (focused ? 220 : 170) : (focused ? 260 : 180))
-                            .setInterpolator(new OvershootInterpolator(focused ? (advancedEffects ? 0.7f : 1.6f) : 0f))
-                            .withLayer().start();
-                    // The banner used to zoom 3.5% inside the card on top of the card's own 12% zoom. Two
-                    // scales on the same pixels meant re-rasterising the 16:9 banner inside a clipped layer
-                    // every frame, which measured 16 ms of draw on its own; the second zoom was invisible
-                    // under the first one anyway.
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    view.setTranslationY(0f);
+                    view.setTranslationZ(lift);
                     name.animate().alpha(focused ? 1f : 0f)
-                            .translationY(focused ? density * 4f : -density * 6f)
-                            .setDuration(220).start();
+                            .translationY(focused ? density * 2f : -density * 4f)
+                            .setDuration(180).start();
                 }
                 int pos = getBindingAdapterPosition();
                 if (focused && listener != null && pos != RecyclerView.NO_POSITION) {

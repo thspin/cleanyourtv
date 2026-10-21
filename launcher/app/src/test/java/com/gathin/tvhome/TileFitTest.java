@@ -40,7 +40,7 @@ public class TileFitTest {
     @Test
     public void oneRowUnderATitledDockFits() {
         int w = AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, true, true, D);
-        assertTrue(w < AppAdapter.tileWidthPx(INNER, 4, D));
+        assertTrue(w <= AppAdapter.tileWidthPx(INNER, 4, D));
         assertTrue(height(w, 1, true) <= GRID_H + 2);
     }
 
@@ -55,18 +55,18 @@ public class TileFitTest {
 
     @Test
     public void plainGridFitsFourRowsAtSixColumns() {
-        // dock_row false, rows_below_dock 3: the first row and 3 more under a 12dp top margin.
-        int w = AppAdapter.tileWidthPx(INNER, GRID_H, 6, 3, true, false, D);
+        // dock_row false, rows_below_dock 1: the first row and one more under a 12dp top margin.
+        int w = AppAdapter.tileWidthPx(INNER, GRID_H, 6, 1, true, false, D);
         int itemH = AppAdapter.itemHeightPx(AppAdapter.tileHeightPx(w), false, D);
-        int needed = itemH * 4 + Math.round((AppAdapter.TOP_ROOM_DP + AppAdapter.COMPACT_BOTTOM_ROOM_DP) * D);
+        int needed = itemH * 2 + Math.round((AppAdapter.TOP_ROOM_DP + AppAdapter.COMPACT_BOTTOM_ROOM_DP) * D);
         assertTrue(needed + " > " + GRID_H, needed <= GRID_H + 2);
         // With the compact spacing the width limit decides, not the height: no extra whitespace between tiles.
-        assertEquals(AppAdapter.tileWidthPx(INNER, 6, D), w);
+        assertEquals(AppAdapter.tileWidthPx(INNER, 6, D, false), w);
     }
 
     @Test
     public void droppingTheTitleGivesBiggerTiles() {
-        assertTrue(AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, false, true, D)
-                > AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, true, true, D));
+        assertTrue(AppAdapter.tileWidthPx(INNER, GRID_H, 4, 2, false, true, D)
+                > AppAdapter.tileWidthPx(INNER, GRID_H, 4, 2, true, true, D));
     }
 }

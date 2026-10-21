@@ -1,11 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Approximate glass for the weather card: flat fill, rim and corner. The real surface is drawn by
-     GlassView (fill + specular + rim + glow) in a later pass; this shape is enough to place the card. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#26FFFFFF" />
-    <stroke
-        android:width="1dp"
-        android:color="#38FFFFFF" />
-    <corners android:radius="22dp" />
-</shape>
+<!--
+  The weather card's glass: a charcoal slab, a whisper of warm white over it and a hairline
+  warm rim. The card is small and sits over the sky, so it reads as a dark pane of glass
+  rather than as a label glued to the photo.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#C7141518"
+                android:endColor="#A6141518"
+                android:type="linear" />
+            <corners android:radius="@dimen/card_radius" />
+        </shape>
+    </item>
+    <!-- The warm white on top of the glass: 5%. -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/glass_sheen" />
+            <corners android:radius="@dimen/card_radius" />
+        </shape>
+    </item>
+    <!-- The hairline edge. -->
+    <item>
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="@color/glass_rim" />
+            <corners android:radius="@dimen/card_radius" />
+        </shape>
+    </item>
+</layer-list>

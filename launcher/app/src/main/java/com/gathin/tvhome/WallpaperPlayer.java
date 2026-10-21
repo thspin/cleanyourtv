@@ -89,12 +89,14 @@ final class WallpaperPlayer {
         // "the theme wants a wallpaper", not "the sdcard has files".
         boolean hasBackdrop = !files.isEmpty() || (byTime && packagedAvailable());
         if (config.wallpaperEnabled && hasBackdrop) {
-            root.addView(image, 0, fullScreen());
             if (byTime) {
+                // The old picture goes in first, so the new one fades in over it. The other order
+                // left the outgoing picture on top and the crossfade was a hard cut at the end of it.
                 background = imageView(context);
                 background.setAlpha(0f);
-                root.addView(background, 1, fullScreen());
+                root.addView(background, 0, fullScreen());
             }
+            root.addView(image, byTime ? 1 : 0, fullScreen());
             // No shade layer at all when the theme doesn't dim: a full-screen view is overdraw on 1 GB TVs.
             if (config.wallpaperDim > 0) {
                 View shade = new View(context);

@@ -1,24 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The action pills under the dock: the same glass as every other surface on the screen (a
+  charcoal slab, a hairline warm rim), so the row reads as part of the dock and not as three
+  separate buttons.
+
+  Focus and press have to be told apart on a remote, where a press is a single flash:
+    - focused: a brighter rim and a 6% warm white over the glass.
+    - pressed:  the glass lights up further (12%) and the rim goes to full warm white.
+-->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#F5FFFFFF" />
-            <corners android:radius="21dp" />
-        </shape>
+
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/glass_fill" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#1FF5F0EA" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1dp"
+                        android:color="@color/focus_ring" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/glass_fill" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#0FF5F0EA" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1dp"
+                        android:color="@color/glass_rim_strong" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
     <!-- Reorder button while reorder mode is on (focus is on the tiles then). -->
     <item android:state_activated="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#596EC1FF" />
-            <stroke android:width="1.5dp" android:color="#FF6EC1FF" />
-            <corners android:radius="21dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/glass_fill" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#1FF5F0EA" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1dp"
+                        android:color="@color/glass_rim_strong" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
     <item>
-        <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#2EFFFFFF" android:endColor="#14FFFFFF" />
-            <stroke android:width="1dp" android:color="#38FFFFFF" />
-            <corners android:radius="21dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/glass_fill" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/glass_sheen" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1dp"
+                        android:color="@color/glass_rim" />
+                    <corners android:radius="@dimen/button_radius" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
 </selector>
