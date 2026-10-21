@@ -89,7 +89,11 @@
          YouTube button sends 190 (KEYCODE_BUTTON_3) to the stock launcher, so it does nothing once launcherx
          is disabled (Chromecast with Google TV, Xiaomi MiTV-AXFR2): 190:com.google.android.youtube.tv brings
          it back. The KTC LUMIO VISION remote (Realtek Google TV) sends Netflix 191, YouTube 190, Prime Video 195
-         and TL;DR 200. A listed app that is not installed leaves the button doing nothing. Leave empty to omit. -->
+         and TL;DR 200. Some remotes send several app buttons as one keycode and tell them apart only by scancode
+         (Sony BRAVIA: YouTube, Prime Video and Disney+ are all keycode 196, scancodes 485, 490 and 491); list those
+         as "scan:scancode:package", e.g. scan:490:com.wbd.hbomax, found with `tools/tv.py 'getevent -lt'` (the
+         EV_KEY code, in hex). A scancode entry wins over a keycode. A listed app that is not installed leaves the
+         button doing nothing. Leave empty to omit. -->
     <string-array name="app_keys" translatable="false">
         <item>190:com.google.android.youtube.tv</item>
     </string-array>
